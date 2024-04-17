@@ -4,4 +4,4 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-mechaia = { path = "../engine/mechaia" }
+mechaia = { path = "../engine/mechaia", features = ["voxel"] }

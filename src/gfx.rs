@@ -1,17 +1,20 @@
 use mechaia::{
     gui::Gui,
-    math::{UVec2, Vec4},
+    math::{UVec2, Vec2, Vec3, Vec4},
     render::{
         resource::{
+            camera::{Camera, CameraView},
             material::pbr::{PbrMaterial, PbrMaterialSet},
+            mesh::{Mesh, MeshSet},
             texture::{TextureFormat, TextureSet},
         },
         stage::{
             renderpass::{RenderPass, RenderPassBuilder},
-            standard3d::{ComputeStage, Standard3D},
+            standard3d::{ComputeStage, Instance, Standard3D},
         },
         Render, StageSetHandle,
     },
+    util::Transform,
     window::Window,
 };
 
@@ -21,6 +24,17 @@ pub struct Gfx {
     pub pbr_transparent: Standard3D,
     pub gui: Gui,
     pub stage_set: StageSetHandle,
+    block_count: u32,
+}
+
+pub struct DrawCollector {
+    pub solid: DrawCollectorOne,
+    pub transparent: DrawCollectorOne,
+}
+
+pub struct DrawCollectorOne {
+    instance_data: Vec<Vec<Instance>>,
+    transforms_data: Vec<Transform>,
 }
 
 impl Gfx {
@@ -59,13 +73,74 @@ impl Gfx {
         let mat_plain_white = 0;
         let mat_plain_green = 1;
 
+        let block_count = crate::load_blocks().meshes.len().try_into().unwrap();
+
         Self {
             render,
             pbr_solid,
             pbr_transparent,
             gui,
             stage_set,
+            block_count,
         }
+    }
+
+    pub fn draw(&mut self, camera: &CameraView, f: &mut dyn FnMut(&mut DrawCollector)) {
+        let d = || DrawCollectorOne {
+            instance_data: (0..self.block_count).map(|_| Vec::new()).collect(),
+            transforms_data: Vec::new(),
+        };
+        let mut collector = DrawCollector {
+            solid: d(),
+            transparent: d(),
+        };
+
+        f(&mut collector);
+
+        self.render.draw(self.stage_set, &mut |index| {
+            for (pbr, coll) in [
+                (&mut self.pbr_solid, &collector.solid),
+                (&mut self.pbr_transparent, &collector.transparent),
+            ] {
+                pbr.set_transform_data(index, &mut coll.transforms_data.iter().copied());
+                pbr.set_instance_data(
+                    index,
+                    &coll
+                        .instance_data
+                        .iter()
+                        .map(|v| u32::try_from(v.len()).unwrap())
+                        .collect::<Vec<_>>(),
+                    &mut coll.instance_data.iter().flatten().copied(),
+                );
+                pbr.set_directional_light(index, Vec3::NEG_ONE.normalize(), Vec3::ONE * 5.0);
+                pbr.set_camera(index, camera);
+            }
+
+            /*
+            self.gui.draw(
+                index,
+                &mut [mechaia::gui::Instance {
+                    position: Vec2::ZERO,
+                    half_extents: Vec2::ONE / 64.0,
+                    rotation: 0.0,
+                    uv_start: Vec2::ZERO,
+                    uv_end: Vec2::ZERO,
+                    texture: 0,
+                }]
+                .into_iter(),
+            )
+                */
+        });
+    }
+}
+
+impl DrawCollectorOne {
+    pub fn push(&mut self, mesh_id: u32, material_id: u32, transforms: &[Transform]) {
+        self.instance_data[usize::try_from(mesh_id).unwrap()].push(Instance {
+            transforms_offset: self.transforms_data.len().try_into().unwrap(),
+            material: material_id,
+        });
+        self.transforms_data.extend_from_slice(transforms);
     }
 }
 
@@ -100,13 +175,28 @@ fn make_pbr_stage(
             ambient_occlusion_texture: tex_white,
         })
         .build();
-    let meshes = crate::load_blocks();
+    let models = crate::load_blocks();
+    let mesh_set = MeshSet::new(
+        render,
+        &models
+            .meshes
+            .iter()
+            .map(|m| Mesh {
+                indices: &m.indices,
+                vertices: m.vertices.as_slice(),
+            })
+            .collect::<Vec<_>>(),
+    );
+    let camera = Camera::new(render);
     Standard3D::new(
         render,
         render_pass,
         texture_set,
         material_set,
-        &meshes,
+        mesh_set,
+        camera,
         transparent,
+        1 << 20,
+        1 << 20,
     )
 }

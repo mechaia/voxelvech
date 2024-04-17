@@ -930,10 +930,12 @@ version = "0.1.0"
 dependencies = [
  "glam",
  "mechaia_gui",
+ "mechaia_model",
  "mechaia_physics3d",
  "mechaia_render",
  "mechaia_sound",
  "mechaia_util",
+ "mechaia_voxel_common",
  "mechaia_window",
 ]
 
@@ -945,6 +947,15 @@ dependencies = [
  "glam",
  "mechaia_render",
  "vk-shader-macros",
+]
+
+[[package]]
+name = "mechaia_model"
+version = "0.1.0"
+dependencies = [
+ "glam",
+ "gltf",
+ "mechaia_util",
 ]
 
 [[package]]
@@ -963,7 +974,6 @@ dependencies = [
  "ash",
  "ash-window",
  "glam",
- "gltf",
  "mechaia_util",
  "raw-window-handle 0.5.2",
  "raw-window-handle 0.6.0",
@@ -981,6 +991,16 @@ dependencies = [
 [[package]]
 name = "mechaia_util"
 version = "0.1.0"
+dependencies = [
+ "glam",
+]
+
+[[package]]
+name = "mechaia_voxel_common"
+version = "0.1.0"
+dependencies = [
+ "glam",
+]
 
 [[package]]
 name = "mechaia_window"

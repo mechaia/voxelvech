@@ -22,4 +22,8 @@ impl StopWatch {
     pub fn delta(&self) -> f32 {
         self.delta
     }
+
+    pub fn delta_now(&self) -> f32 {
+        Instant::now().duration_since(self.last).as_secs_f32()
+    }
 }

@@ -1,6 +1,6 @@
 use mechaia::{
     math::{EulerRot, Quat, Vec3},
-    render::CameraProjection,
+    render::resource::camera::{CameraProjection, CameraView},
 };
 use std::f32::consts::{FRAC_PI_2, TAU};
 
@@ -45,8 +45,8 @@ impl FreeCamera {
         Quat::from_euler(EulerRot::YZX, self.tilt, self.pan, 0.0)
     }
 
-    pub fn to_render(&self, aspect: f32) -> mechaia::render::Camera {
-        mechaia::render::Camera {
+    pub fn to_render(&self, aspect: f32) -> CameraView {
+        CameraView {
             translation: self.translation,
             rotation: self.rotation(),
             projection: CameraProjection::Perspective { fov: FRAC_PI_2 },
