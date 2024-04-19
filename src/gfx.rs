@@ -1,6 +1,8 @@
+use std::thread::current;
+
 use mechaia::{
     gui::Gui,
-    math::{UVec2, Vec2, Vec3, Vec4},
+    math::{U16Vec2, UVec2, Vec2, Vec3, Vec4},
     render::{
         resource::{
             camera::{Camera, CameraView},
@@ -24,6 +26,7 @@ pub struct Gfx {
     pub pbr_transparent: Standard3D,
     pub gui: Gui,
     pub stage_set: StageSetHandle,
+    font: mechaia::gui::font::FontMap,
     block_count: u32,
 }
 
@@ -50,9 +53,15 @@ impl Gfx {
         let (pbr_transparent, pbr_transparent_stage) =
             make_pbr_stage(&mut render, &mut render_pass, true);
 
+        let font;
+
         let gui = {
-            let texture_set = TextureSet::builder(&mut render, TextureFormat::Rgba8Unorm, 1)
+            //font = mechaia::gui::font::bdf::parse_from_str(mechaia::gui::font::bdf::SPLEEN_16X32);
+            font = mechaia::gui::font::bdf::parse_from_str(mechaia::gui::font::bdf::SPLEEN_32X64);
+
+            let texture_set = TextureSet::builder(&mut render, TextureFormat::Rgba8Unorm, 2)
                 .push(UVec2::new(1, 1), &mut |s| s.fill(u8::MAX))
+                .push(font.dimensions(), &mut |s| font.copy_into_rgba(s))
                 .build();
             mechaia::gui::push(&mut render, &mut render_pass, 1024, texture_set)
         };
@@ -80,6 +89,7 @@ impl Gfx {
             pbr_solid,
             pbr_transparent,
             gui,
+            font,
             stage_set,
             block_count,
         }
@@ -116,20 +126,76 @@ impl Gfx {
                 pbr.set_camera(index, camera);
             }
 
+            let dim = self.font.dimensions().as_vec2();
+            let mut offt = 0;
             /*
-            self.gui.draw(
-                index,
-                &mut [mechaia::gui::Instance {
-                    position: Vec2::ZERO,
-                    half_extents: Vec2::ONE / 64.0,
+            //let letters = "Hello, world!".chars().flat_map(|c| self.font.get(c))
+            let letters = "Héllo, wòrld!".chars().flat_map(|c| self.font.get(c))
+            //let letters = "%".chars().flat_map(|c| self.font.get(c))
+                .map(|r| {
+                    let o = offt;
+                    offt += r.size.x;
+                    mechaia::gui::Instance {
+                        position: U16Vec2::new(o, 0) + r.size / 2 + U16Vec2::ONE * 4,
+                        size: r.size,
+                        rotation: 0.0,
+                        uv_start: r.texture.start.as_vec2() / dim,
+                        uv_end: r.texture.end.as_vec2() / dim,
+                        texture: 1,
+                    }
+                });
+
+            for inst in letters {
+                draw.push(&inst);
+            }
+            */
+            use mechaia::gui::immediate as im;
+            let mut layout = im::Layouter::new(&self.gui);
+            let draw = &mut self.gui.draw(index);
+
+            /*
+            let v = im::Value::Norm(0.25);
+            layout.push_margin(im::Margin {
+                left: v,
+                top: v,
+                right: v,
+                bottom: v,
+            });
+
+            let r = layout.current();
+            draw.push(&mechaia::gui::Instance {
+                position: r.offset,
+                size: r.size,
+                rotation: 0.0,
+                uv_start: Vec2::ZERO,
+                uv_end: Vec2::ZERO,
+                texture: 0,
+                color: Vec4::new(0.0, 0.5, 1.0, 1.0),
+            });
+
+            let size = im::text::size("Hello, world!", &self.font);
+            let r = layout.current().center_rect_offset(size);
+
+            im::text::draw(draw, r, layout.current(), "Hello, world!", 1, Vec4::new(1.0, 1.0, 1.0, 1.0), &self.font);
+            */
+
+            // crosshair
+            {
+                let r = layout.current();
+                // 1x1 pixel is too small to see a damn thing, so use 2x2 and 3x3
+                // also only consider x to keep it square
+                let size = U16Vec2::splat(2) + (r.size.x % 2);
+                let position = layout.current().center_rect_offset(size);
+                draw.push(&mechaia::gui::Instance {
+                    position: position.try_into().unwrap_or(U16Vec2::ZERO),
+                    size,
                     rotation: 0.0,
                     uv_start: Vec2::ZERO,
                     uv_end: Vec2::ZERO,
                     texture: 0,
-                }]
-                .into_iter(),
-            )
-                */
+                    color: Vec4::new(1.0, 1.0, 1.0, 1.0),
+                });
+            }
         });
     }
 }
