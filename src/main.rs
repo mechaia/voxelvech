@@ -1,6 +1,5 @@
 mod camera;
 mod gfx;
-mod input;
 mod physics;
 mod player;
 mod time;
@@ -10,6 +9,7 @@ use core::iter;
 use mechaia::{
     math::{EulerRot, IVec3, Quat, UVec2, Vec2, Vec3},
     physics3d,
+    input,
 };
 use std::time::{Duration, Instant};
 
@@ -19,34 +19,7 @@ fn load_blocks() -> mechaia::model::Collection {
     mechaia::model::gltf::from_glb_slice(include_bytes!("../data/basicblocks.glb"))
 }
 
-mod defaults {
-    pub mod inputmap {
-        use mechaia::window::InputKey::{self, *};
-        pub const INPUTMAP_AZERTY: &[(&str, InputKey, f32)] = &[
-            ("editor.camera.forward", Z, 10.0),
-            ("editor.camera.forward", S, -10.0),
-            ("editor.camera.sideways", Q, -10.0),
-            ("editor.camera.sideways", D, 10.0),
-            ("editor.camera.up", Space, 10.0),
-            ("editor.camera.up", LCtrl, -10.0),
-            ("editor.camera.pan", MouseRelativeX, -0.01),
-            ("editor.camera.tilt", MouseRelativeY, -0.01),
-            ("editor.select_block.toggle", E, 1.0),
-            ("editor.select_block.side", MouseRelativeY, -0.01),
-            ("editor.select_block.up", MouseRelativeX, -0.01),
-            ("editor.place", MouseButtonL, 1.0),
-            ("editor.remove", MouseButtonR, 1.0),
-            ("editor.rotate", MouseWheelY, 1.0),
-            ("editor.mirror.x.enable", M, 1.0),
-            ("editor.mirror.x.shift", PageUp, 1.0),
-            ("editor.mirror.x.shift", PageDown, -1.0),
-            ("vehicle.control.forward", U, 1.0),
-            ("vehicle.control.forward", J, -1.0),
-            ("vehicle.control.pan", H, -1.0),
-            ("vehicle.control.pan", K, 1.0),
-        ];
-    }
-}
+const DEFAULT_INPUT_MAP: &str = include_str!("../data/inputmap_azerty.txt");
 
 fn main() {
     let mut physics = Physics::new();
@@ -54,7 +27,12 @@ fn main() {
 
     vehicle.force_add(&mut physics, IVec3::ZERO, vehicle::Block::new(1, 0, 0));
 
-    let inputs = input::InputMap::from_list(defaults::inputmap::INPUTMAP_AZERTY);
+    let inputs = {
+        let cfg = DEFAULT_INPUT_MAP;
+        input::InputMap::parse_from_lines_graceful(cfg.lines(), &mut |i, msg| {
+            dbg!(i, msg);
+        })
+    };
 
     let mut window = mechaia::window::Window::new();
     let mut gfx = gfx::Gfx::new(&mut window);
@@ -102,7 +80,7 @@ fn main() {
             inputs
                 .get(k)
                 .iter()
-                .map(|&(i, s)| window.input(i) * s)
+                .flat_map(|(i, s)| s.apply(window.input(i)))
                 .sum()
         };
 

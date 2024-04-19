@@ -1,0 +1,18 @@
+# input                       key               range          remap
+editor.camera.forward         z                  0 1            0 10
+editor.camera.forward         s                  0 1            0 -10
+editor.camera.sideways        q                  0 1            0 -10
+editor.camera.sideways        d                  0 1            0 10
+editor.camera.up              :space             0 1            0 10
+editor.camera.up              :lctrl             0 1            0 -10
+# TODO how should we do this properly?
+editor.camera.pan             :mouserelativex    -10000 10000   100 -100
+editor.camera.tilt            :mouserelativey    -10000 10000   100 -100
+editor.select_block.toggle    e                  0 1            0 1
+editor.place                  :mousebuttonl      0 1            0 1
+editor.remove                 :mousebuttonr      0 1            0 1
+editor.rotate                 :mousewheely       -1 1            -1 1
+vehicle.control.forward       u                  0 1            0 1
+vehicle.control.forward       j                  0 1            0 -1
+vehicle.control.pan           h                  0 1            0 -1
+vehicle.control.pan           k                  0 1            0 1
