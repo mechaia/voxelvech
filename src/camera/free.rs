@@ -52,7 +52,7 @@ impl FreeCamera {
             projection: CameraProjection::Perspective { fov: FRAC_PI_2 },
             aspect,
             near: 0.1,
-            far: 100.0,
+            far: 1000.0,
         }
     }
 }

@@ -103,13 +103,15 @@ impl Vehicle {
         let wheel_max_torque = 100.0;
         let wheel_max_angle = core::f32::consts::FRAC_PI_6;
         let forward = controls.forward.clamp(-1.0, 1.0);
+        let brake = f32::from(forward == 0.0);
         let pan = controls.pan.clamp(-1.0, 1.0);
         for (&pos, &w) in self.physics.pos_to_wheel.iter() {
             //let forward = if pos.x < 0 { -forward } else { forward };
             let forward = if pos.y < 0 { -forward } else { forward };
             let pan = if pos.x < 0 { 0.0 } else { pan };
             self.physics.vehicle_body.set_wheel_angle(w, pan * wheel_max_angle);
-            self.physics.vehicle_body.set_wheel_torque(w, dbg!(forward * wheel_max_torque));
+            self.physics.vehicle_body.set_wheel_torque(w, forward * wheel_max_torque);
+            self.physics.vehicle_body.set_wheel_brake(w, brake);
         }
     }
 }
