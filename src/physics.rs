@@ -1,5 +1,6 @@
 use mechaia::{
     math::{Quat, Vec3},
+    model::Collection,
     physics3d::{
         self, ColliderHandle, ColliderProperties, RigidBodyHandle, ShapeHandle, Transform,
     },
@@ -9,7 +10,8 @@ use crate::gfx::DrawCollector;
 
 // set it extremely high so we remember to implement interpolation
 //const TIME_DELTA: f32 = 1.0 / 10.0;
-const TIME_DELTA: f32 = 1.0 / 100.0;
+const TIME_DELTA: f32 = 1.0 / 30.0;
+//const TIME_DELTA: f32 = 1.0 / 100.0;
 
 pub struct Physics {
     pub engine: physics3d::Physics,
@@ -23,16 +25,15 @@ pub struct ShapeCache {
 
 struct World {
     body: RigidBodyHandle,
-    shapes: Vec<ShapeHandle>,
-    colliders: Vec<ColliderHandle>,
+    meshes: Vec<(Transform, u32)>,
 }
 
 impl Physics {
-    pub fn new() -> Self {
+    pub fn new(collection: &Collection) -> Self {
         let mut engine = physics3d::Physics::new();
         engine.set_time_delta(TIME_DELTA);
         let shape_cache = ShapeCache::new(&mut engine);
-        let world = World::new(&mut engine);
+        let world = World::new(&mut engine, collection);
         Self {
             engine,
             shape_cache,
@@ -41,9 +42,11 @@ impl Physics {
     }
 
     pub fn render(&self, collector: &mut DrawCollector) {
-        let mut trf = self.engine.rigid_body_transform(self.world.body);
-        trf.translation += Vec3::new(0.0, 0.0, -10.0);
-        collector.solid.push(5, 0, &[trf.into()]);
+        let mut gtrf = self.engine.rigid_body_transform(self.world.body);
+        for (trf, mesh) in self.world.meshes.iter() {
+            let trf = gtrf.apply_to_transform(trf);
+            collector.solid.push(*mesh, 2, &[trf.into()]);
+        }
     }
 }
 
@@ -56,32 +59,86 @@ impl ShapeCache {
 }
 
 impl World {
-    fn new(engine: &mut physics3d::Physics) -> Self {
+    fn new(engine: &mut physics3d::Physics, collection: &Collection) -> Self {
         let body = engine.make_fixed_rigid_body();
-        let mut shapes = Vec::new();
-        let mut colliders = Vec::new();
-        // add world floor
-        {
-            let floor_shape = engine.make_halfspace_shape(Vec3::Z);
-            let properties = &ColliderProperties {
-                local_transform: Transform {
-                    rotation: Quat::IDENTITY,
-                    //translation: Vec3::new(0.0, 0.0, -256.0),
-                    translation: Vec3::new(0.0, 0.0, -10.0),
-                },
-                // numbers pulled from my ass
-                friction: 0.8,
-                bounciness: 0.05,
-                user_data: 0,
-            };
-            let floor_collider = engine.add_collider(body, floor_shape, &properties);
-            shapes.push(floor_shape);
-            colliders.push(floor_collider);
+
+        let mut meshes = Vec::new();
+
+        // load map
+        let mechaia::model::Node::Parent {
+            children: scenes, ..
+        } = &collection.scenes[0]
+        else {
+            todo!()
+        };
+        for (trf, root) in scenes.iter() {
+            if root
+                .properties()
+                .name
+                .as_ref()
+                .is_some_and(|s| s.starts_with("map."))
+            {
+                let trf = Transform {
+                    translation: trf.translation.into(),
+                    rotation: trf.rotation,
+                };
+                add_objects(engine, body, collection, &trf, root, &mut meshes);
+                break;
+            }
         }
-        Self {
-            body,
-            shapes,
-            colliders,
-        }
+        Self { body, meshes }
+    }
+}
+
+fn add_objects(
+    physics: &mut physics3d::Physics,
+    body: RigidBodyHandle,
+    collection: &Collection,
+    transform: &Transform,
+    node: &mechaia::model::Node,
+    meshes: &mut Vec<(Transform, u32)>,
+) {
+    'add: {
+        let prop = node.properties();
+        let Some(name) = prop.name.as_deref() else {
+            break 'add;
+        };
+        let Some((ty, _)) = name.split_once('.') else {
+            break 'add;
+        };
+        let mechaia::model::Node::Leaf { model, .. } = node else {
+            break 'add;
+        };
+        let model = &collection.models[*model];
+        let shape = match ty {
+            "halfspace" => physics.make_halfspace_shape(Vec3::Z),
+            "convex" => {
+                //physics.make_convex_mesh_indexed_shape(mesh.vertices.as_slices().0, &mesh.indices);
+                let mesh = &collection.meshes[model.mesh_index];
+                physics.make_convex_hull_shape(mesh.vertices.as_slices().0)
+            }
+            "map" => break 'add,
+            _ => todo!("{ty}"),
+        };
+        let properties = &ColliderProperties {
+            local_transform: dbg!(*transform),
+            // numbers pulled from my ass
+            friction: 0.8,
+            bounciness: 0.05,
+            user_data: 0,
+        };
+        physics.add_collider(body, shape, &properties);
+        meshes.push((*transform, model.mesh_index.try_into().unwrap()));
+    }
+
+    let mechaia::model::Node::Parent { children, .. } = node else {
+        return;
+    };
+    for (trf, c) in children.iter() {
+        let trf = transform.apply_to_transform(&Transform {
+            translation: trf.translation.into(),
+            rotation: trf.rotation,
+        });
+        add_objects(physics, body, collection, &trf, c, meshes);
     }
 }

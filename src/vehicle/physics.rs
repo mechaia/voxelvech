@@ -2,7 +2,10 @@ use super::Block;
 use crate::Physics;
 use mechaia::{
     math::{IVec3, Vec3},
-    physics3d::{wheel::{VehicleBody, Wheel, WheelHandle, WheelSuspension}, ColliderHandle, ColliderProperties, RigidBodyHandle, Transform},
+    physics3d::{
+        wheel::{VehicleBody, Wheel, WheelHandle, WheelSuspension},
+        ColliderHandle, ColliderProperties, RigidBodyHandle, SetRigidBodyProperties, Transform,
+    },
 };
 use std::collections::HashMap;
 
@@ -11,6 +14,9 @@ pub struct Body {
     colliders: HashMap<IVec3, ColliderHandle>,
     pub(super) pos_to_wheel: HashMap<IVec3, WheelHandle>,
     pub(super) vehicle_body: VehicleBody,
+
+    pub(super) prev_transform: Transform,
+    pub(super) prev_wheel_transforms: HashMap<WheelHandle, (Transform, Transform)>,
 }
 
 impl Body {
@@ -20,6 +26,9 @@ impl Body {
             colliders: Default::default(),
             pos_to_wheel: Default::default(),
             vehicle_body: VehicleBody::new(),
+
+            prev_transform: Transform::IDENTITY,
+            prev_wheel_transforms: Default::default(),
         }
     }
 
@@ -48,17 +57,18 @@ impl Body {
                     rotation: block.orientation(),
                 },
                 radius: 1.5,
-                //static_friction: 0.8,
-                static_friction: 1.0,
+                static_friction: 0.8,
                 dynamic_friction: 0.6,
                 suspension: WheelSuspension {
-                    max_length: 0.5,
-                    force_per_distance: 600.0,
+                    max_length: 0.6,
+                    force_per_distance: 5000.0,
                     damp_per_velocity: 50.0,
                 },
             };
             let w = self.vehicle_body.add_wheel(w);
             self.pos_to_wheel.insert(pos, w);
+            let trfs = self.vehicle_body.wheel_local_transform(w);
+            self.prev_wheel_transforms.insert(w, trfs);
         }
     }
 
@@ -68,17 +78,48 @@ impl Body {
             .remove(&pos)
             .expect("no collider at location");
         physics.engine.remove_collider(self.body, handle);
-        
+
         if let Some(w) = self.pos_to_wheel.remove(&pos) {
             self.vehicle_body.remove_wheel(w);
+            self.prev_wheel_transforms.remove(&w);
         }
     }
 
     pub fn step(&mut self, physics: &mut Physics) {
+        self.prev_transform = self.transform(physics);
+        for (&w, trfs) in self.prev_wheel_transforms.iter_mut() {
+            *trfs = self.vehicle_body.wheel_local_transform(w);
+        }
         self.vehicle_body.apply(&mut physics.engine, self.body);
     }
 
     pub fn transform(&self, physics: &Physics) -> Transform {
         physics.engine.rigid_body_transform(self.body)
+    }
+
+    pub fn set_transform(&mut self, physics: &mut Physics, transform: &Transform) {
+        physics.engine.set_rigid_body_properties(
+            self.body,
+            &SetRigidBodyProperties {
+                world_transform: Some(*transform),
+                linear_velocity: Some(Vec3::ZERO),
+                angular_velocity: Some(Vec3::ZERO),
+                enable_ccd: None,
+            },
+        );
+    }
+
+    pub fn center_of_mass(&self, physics: &Physics) -> Vec3 {
+        physics.engine.rigid_body_center_of_mass(self.body)
+    }
+
+    pub fn clear(&mut self, physics: &mut Physics) {
+        for (_, c) in self.colliders.drain() {
+            physics.engine.remove_collider(self.body, c)
+        }
+        for (_, w) in self.pos_to_wheel.drain() {
+            self.vehicle_body.remove_wheel(w);
+            self.prev_wheel_transforms.remove(&w);
+        }
     }
 }
