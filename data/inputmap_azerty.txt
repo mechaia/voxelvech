@@ -12,6 +12,7 @@ editor.select_block.toggle    e                  0 1            0 1
 editor.place                  :mousebuttonl      0 1            0 1
 editor.remove                 :mousebuttonr      0 1            0 1
 editor.rotate                 :mousewheely       -1 1           -1 1
+editor.deathray.heat          :ampersand         0 1            0 1
 ui.toggle                     :esc               0 1            0 1
 ui.up                         :arrowup           0 1            0 1
 ui.down                       :arrowdown         0 1            0 1

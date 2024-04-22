@@ -1,7 +1,7 @@
 use crate::{
     camera::FreeCamera,
     physics::Physics,
-    vehicle::{Block, BlockSet, Vehicle},
+    vehicle::{Block, BlockSet, DamageAccumulator, Vehicle},
 };
 use mechaia::{
     input::{InputMap, TriggerEdge},
@@ -30,6 +30,7 @@ struct Triggers {
     rotate: TriggerEdge,
     place: TriggerEdge,
     remove: TriggerEdge,
+    deathray_heat: TriggerEdge,
 }
 
 pub struct InputEffects {
@@ -86,7 +87,7 @@ impl Player {
         let mut vehicle_dirty = false;
         let mut block_ghost = None;
 
-        let mut query = vehicle.query_ray(physics, camera.translation(), camera.direction());
+        let mut query = vehicle.query_ray(physics, camera.translation(), camera.direction(), false);
 
         if let Some(q) = &query {
             if let Some(free) = q.free {
@@ -112,7 +113,7 @@ impl Player {
 
                 if self.triggers.place.apply(f("editor.place")) {
                     let blk = Block::new(self.block_id, dir, *rot);
-                    vehicle.force_add(physics, free, blk);
+                    vehicle.force_add(physics, block_set, free, blk);
                     vehicle_dirty = true;
                 }
             }
@@ -126,7 +127,20 @@ impl Player {
             // recast ray if block got added or removed for visual consistency of ghost block
             if vehicle_dirty {
                 let Mode::Free { camera } = &self.mode;
-                query = vehicle.query_ray(physics, camera.translation(), camera.direction());
+                query = vehicle.query_ray(physics, camera.translation(), camera.direction(), false);
+            }
+        }
+
+        if self.triggers.deathray_heat.apply(f("editor.deathray.heat")) && !vehicle_dirty {
+            let Mode::Free { camera } = &self.mode;
+            let dmg_query = vehicle.query_ray(physics, camera.translation(), camera.direction(), true);
+            if let Some(q) = &dmg_query {
+                let mut acc = DamageAccumulator::default();
+                acc.add_heat(q.occupied, 260);
+                vehicle.apply_damage(acc);
+
+                let Mode::Free { camera } = &self.mode;
+                query = vehicle.query_ray(physics, camera.translation(), camera.direction(), false);
             }
         }
 

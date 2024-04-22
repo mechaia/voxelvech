@@ -1,18 +1,23 @@
+mod block;
+mod damage;
 mod physics;
 mod turret;
 
 use crate::{gfx::DrawCollector, physics::Physics};
 use mechaia::{
-    math::{IVec3, Quat, Vec3, Vec3Swizzles},
+    math::{IVec3, Vec3, Vec3Swizzles},
     model::Collection,
     util::Transform,
     voxel,
 };
-use std::collections::HashMap;
+use std::{collections::HashMap, ops::Index};
+
+pub use {block::Block, damage::DamageAccumulator};
 
 pub struct Vehicle {
     physics: physics::Body,
     voxels: voxel::common::Map<Block>,
+    damage: damage::Body,
     turrets: HashMap<IVec3, Turret>,
 }
 
@@ -35,10 +40,11 @@ pub struct BlockSet {
     name_to_id: HashMap<Box<str>, u32>,
 }
 
-struct BlockSetEntry {
+pub struct BlockSetEntry {
     name: Box<str>,
     mesh: u32,
     armature: u32,
+    health: u32,
 }
 
 impl BlockSet {
@@ -69,6 +75,7 @@ impl BlockSet {
                         } else {
                             model.armature_index.try_into().unwrap()
                         },
+                        health: 100,
                     });
                     name_to_id.insert(name, i);
                 }
@@ -107,17 +114,26 @@ impl BlockSet {
     }
 }
 
+impl Index<u32> for BlockSet {
+    type Output = BlockSetEntry;
+
+    fn index(&self, id: u32) -> &Self::Output {
+        &self.blocks[usize::try_from(id).unwrap()]
+    }
+}
+
 impl Vehicle {
     pub fn new(physics: &mut Physics) -> Self {
         Self {
             physics: physics::Body::new(physics),
             voxels: voxel::common::Map::new(),
             turrets: Default::default(),
+            damage: Default::default(),
         }
     }
 
     /// Add a block without any sanity checks.
-    pub fn force_add(&mut self, physics: &mut Physics, pos: IVec3, block: Block) {
+    pub fn force_add(&mut self, physics: &mut Physics, block_set: &BlockSet, pos: IVec3, block: Block) {
         self.physics.add(physics, pos, &block);
         if block.id == 5 {
             self.turrets.insert(
@@ -129,6 +145,7 @@ impl Vehicle {
             );
         }
         self.voxels.insert(pos, block);
+        self.damage.insert(block_set, pos, block, false);
     }
 
     /// Remove a block without any sanity checks.
@@ -136,6 +153,7 @@ impl Vehicle {
         self.physics.remove(physics, pos);
         self.voxels.remove(pos);
         self.turrets.remove(&pos);
+        self.damage.remove(pos);
     }
 
     pub fn query_ray(
@@ -143,6 +161,7 @@ impl Vehicle {
         physics: &Physics,
         start: Vec3,
         direction: Vec3,
+        ignore_dead: bool,
     ) -> Option<QueryRayResult> {
         let trf = self.physics.transform(physics);
 
@@ -153,10 +172,12 @@ impl Vehicle {
         let mut free = None;
         for pos in ray.take(1024) {
             if self.voxels.get(pos).is_some() {
-                return Some(QueryRayResult {
-                    occupied: pos,
-                    free,
-                });
+                if !ignore_dead || self.damage.health(pos) > 0 {
+                    return Some(QueryRayResult {
+                        occupied: pos,
+                        free,
+                    });
+                }
             }
             free = Some(pos);
         }
@@ -182,6 +203,11 @@ impl Vehicle {
             .interpolate(&end_trf, interpolation);
 
         for (pos, blk) in self.voxels.iter() {
+            let hp = self.damage.health(pos);
+            if hp == 0 {
+                continue;
+            }
+
             let mut trfs = Vec::new();
             let mut push = |tr, rot| trfs.push(trf.apply_to_transform(&Transform::new(tr, rot)).into());
             if blk.id != 5 {
@@ -302,6 +328,17 @@ impl Vehicle {
     }
 }
 
+/// Damage stuff
+impl Vehicle {
+    pub fn apply_damage(&mut self, acc: DamageAccumulator) {
+        acc.apply(&mut self.damage);
+    }
+
+    pub fn reset_damage(&mut self, block_set: &BlockSet) {
+        self.damage.reset(block_set)
+    }
+}
+
 pub struct QueryRayResult {
     pub occupied: IVec3,
     /// May be none if the ray started inside an object.
@@ -315,55 +352,6 @@ fn translation_world_to_local(world: Vec3, local_to_world: &Transform) -> Vec3 {
 fn direction_world_to_local(world: Vec3, local_to_world: &Transform) -> Vec3 {
     //local_to_world.rotation.inverse() * world
     local_to_world.rotation.inverse() * world
-}
-
-#[derive(Clone)]
-pub struct Block {
-    pub id: u32,
-    orientation: u8,
-}
-
-impl Block {
-    pub fn new(id: u32, direction: u8, rotation: u8) -> Self {
-        let mut s = Self { id, orientation: 0 };
-        s.set_direction(direction);
-        s.set_rotation(rotation);
-        s
-    }
-
-    pub fn direction(&self) -> u8 {
-        self.orientation & 7
-    }
-
-    pub fn rotation(&self) -> u8 {
-        self.orientation >> 3
-    }
-
-    pub fn set_direction(&mut self, direction: u8) {
-        debug_assert!(direction < 6);
-        self.orientation &= !7;
-        self.orientation |= direction;
-    }
-
-    pub fn set_rotation(&mut self, rotation: u8) {
-        debug_assert!(rotation < 4);
-        self.orientation &= 7;
-        self.orientation |= rotation << 3;
-    }
-
-    pub fn orientation(&self) -> Quat {
-        use core::f32::consts::{FRAC_PI_2, PI};
-        let r = match self.direction() {
-            0 => Quat::IDENTITY,
-            1 => Quat::from_rotation_x(PI),
-            2 => Quat::from_rotation_x(-FRAC_PI_2),
-            3 => Quat::from_rotation_x(FRAC_PI_2),
-            4 => Quat::from_rotation_y(FRAC_PI_2),
-            5 => Quat::from_rotation_y(-FRAC_PI_2),
-            _ => unreachable!(),
-        };
-        r * Quat::from_rotation_z(FRAC_PI_2 * f32::from(self.rotation()))
-    }
 }
 
 /// (De)serializer for v0 text format
@@ -397,6 +385,7 @@ impl Vehicle {
         self.voxels.clear();
         self.physics.clear(physics);
         self.turrets.clear();
+        self.damage.clear();
 
         for (i, line) in text.lines().enumerate() {
             let line = line.split_once('#').map_or(line, |l| l.0);
@@ -420,7 +409,7 @@ impl Vehicle {
                 }),
                 orientation,
             };
-            self.force_add(physics, IVec3::new(x, y, z), blk);
+            self.force_add(physics, block_set, IVec3::new(x, y, z), blk);
         }
     }
 }

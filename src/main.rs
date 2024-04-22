@@ -97,7 +97,7 @@ impl Autosaver {
             }
             let name = f.file_name();
             let Some(name) = name.to_str() else {
-                log::warn("filename with non-Unicde characters. Skipping");
+                log::warn("filename with non-Unicode characters. Skipping");
                 continue;
             };
             if !name.ends_with(".vvt") {
@@ -139,6 +139,7 @@ fn main() {
 
     vehicle.force_add(
         &mut physics,
+        &block_set,
         IVec3::ZERO,
         vehicle::Block::new(block_set.cube_id(), 0, 0),
     );
@@ -297,6 +298,7 @@ fn main() {
                         }
                         "reset vehicle" => {
                             vehicle.set_transform(&mut physics, &Transform::IDENTITY);
+                            vehicle.reset_damage(&block_set);
                             gfx.gui.data.show = None;
                         }
                         s => todo!("{s}"),
