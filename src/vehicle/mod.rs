@@ -396,6 +396,7 @@ impl Vehicle {
     pub fn load_v0_text(&mut self, block_set: &BlockSet, physics: &mut Physics, text: &str) {
         self.voxels.clear();
         self.physics.clear(physics);
+        self.turrets.clear();
 
         for (i, line) in text.lines().enumerate() {
             let line = line.split_once('#').map_or(line, |l| l.0);
