@@ -1,16 +1,14 @@
 mod physics;
 mod turret;
 
-use std::collections::HashMap;
-
 use crate::{gfx::DrawCollector, physics::Physics};
 use mechaia::{
-    math::{IVec3, Quat, Vec2, Vec3, Vec3Swizzles},
+    math::{IVec3, Quat, Vec3, Vec3Swizzles},
     model::Collection,
-    physics3d, voxel,
+    util::Transform,
+    voxel,
 };
-
-use self::turret::calc_pan_tilt;
+use std::collections::HashMap;
 
 pub struct Vehicle {
     physics: physics::Body,
@@ -185,15 +183,7 @@ impl Vehicle {
 
         for (pos, blk) in self.voxels.iter() {
             let mut trfs = Vec::new();
-            let mut push = |tr, rot| {
-                trfs.push(
-                    trf.apply_to_transform(&physics3d::Transform {
-                        translation: tr,
-                        rotation: rot,
-                    })
-                    .into(),
-                )
-            };
+            let mut push = |tr, rot| trfs.push(trf.apply_to_transform(&Transform::new(tr, rot)).into());
             if blk.id != 5 {
                 push(pos.as_vec3(), blk.orientation());
             }
@@ -225,11 +215,11 @@ impl Vehicle {
         }
     }
 
-    pub fn transform(&self, physics: &Physics) -> physics3d::Transform {
+    pub fn transform(&self, physics: &Physics) -> Transform {
         self.physics.transform(physics)
     }
 
-    pub fn set_transform(&mut self, physics: &mut Physics, transform: &physics3d::Transform) {
+    pub fn set_transform(&mut self, physics: &mut Physics, transform: &Transform) {
         self.physics.set_transform(physics, transform)
     }
 
@@ -240,7 +230,7 @@ impl Vehicle {
         collection: &Collection,
         physics: &Physics,
         controls: &InputControls,
-    ) -> Vec<(physics3d::Transform, f32)> {
+    ) -> Vec<(Transform, f32)> {
         // movement
         let com = self.physics.center_of_mass(physics);
 
@@ -269,19 +259,15 @@ impl Vehicle {
 
         for (&pos, turret) in self.turrets.iter_mut() {
             let blk = self.voxels.get(pos).unwrap();
-            let trf = mechaia::physics3d::Transform {
-                translation: pos.as_vec3(),
-                rotation: blk.orientation(),
-            };
+            let trf = Transform::new(pos.as_vec3(), blk.orientation());
             let target = trf.apply_to_translation_inv(target);
 
             let armature = block_set.get_armature(blk.id);
             let armature = &collection.armatures[armature as usize];
-            use mechaia::model::Transform;
             let trfs = armature.apply(&Transform::IDENTITY, &[Transform::IDENTITY; 3], false);
             let tilt_joint_offset = trfs[2].translation.xz();
 
-            (turret.pan, turret.tilt) = calc_pan_tilt(target, tilt_joint_offset);
+            (turret.pan, turret.tilt) = turret::calc_pan_tilt(target, tilt_joint_offset);
         }
 
         // fire
@@ -304,7 +290,9 @@ impl Vehicle {
                 );
                 let muzzle_trf = t[2];
                 let dir = muzzle_trf.apply_to_direction(Vec3::Y);
-                let ray = physics.engine.cast_ray(muzzle_trf.translation, dir * 1e3, None);
+                let ray = physics
+                    .engine
+                    .cast_ray(muzzle_trf.translation, dir * 1e3, None);
                 let dist = ray.map_or(1e3, |r| r.distance);
                 projectiles.push((muzzle_trf, dist));
             }
@@ -320,11 +308,11 @@ pub struct QueryRayResult {
     pub free: Option<IVec3>,
 }
 
-fn translation_world_to_local(world: Vec3, local_to_world: &physics3d::Transform) -> Vec3 {
+fn translation_world_to_local(world: Vec3, local_to_world: &Transform) -> Vec3 {
     local_to_world.rotation.inverse() * (world - local_to_world.translation)
 }
 
-fn direction_world_to_local(world: Vec3, local_to_world: &physics3d::Transform) -> Vec3 {
+fn direction_world_to_local(world: Vec3, local_to_world: &Transform) -> Vec3 {
     //local_to_world.rotation.inverse() * world
     local_to_world.rotation.inverse() * world
 }

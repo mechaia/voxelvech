@@ -1,9 +1,8 @@
 use mechaia::{
-    math::{Quat, Vec3},
+    math::Vec3,
     model::Collection,
-    physics3d::{
-        self, ColliderHandle, ColliderProperties, RigidBodyHandle, ShapeHandle, Transform,
-    },
+    physics3d::{self, ColliderProperties, RigidBodyHandle, ShapeHandle},
+    util::Transform,
 };
 
 use crate::gfx::DrawCollector;
@@ -42,7 +41,7 @@ impl Physics {
     }
 
     pub fn render(&self, collector: &mut DrawCollector) {
-        let mut gtrf = self.engine.rigid_body_transform(self.world.body);
+        let gtrf = self.engine.rigid_body_transform(self.world.body);
         for (trf, mesh) in self.world.meshes.iter() {
             let trf = gtrf.apply_to_transform(trf);
             collector.solid.push(*mesh, 2, &[trf.into()]);
@@ -78,10 +77,6 @@ impl World {
                 .as_ref()
                 .is_some_and(|s| s.starts_with("map."))
             {
-                let trf = Transform {
-                    translation: trf.translation.into(),
-                    rotation: trf.rotation,
-                };
                 add_objects(engine, body, collection, &trf, root, &mut meshes);
                 break;
             }
@@ -135,10 +130,7 @@ fn add_objects(
         return;
     };
     for (trf, c) in children.iter() {
-        let trf = transform.apply_to_transform(&Transform {
-            translation: trf.translation.into(),
-            rotation: trf.rotation,
-        });
+        let trf = transform.apply_to_transform(trf);
         add_objects(physics, body, collection, &trf, c, meshes);
     }
 }

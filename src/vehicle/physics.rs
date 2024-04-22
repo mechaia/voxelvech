@@ -4,8 +4,9 @@ use mechaia::{
     math::{IVec3, Vec3},
     physics3d::{
         wheel::{VehicleBody, Wheel, WheelHandle, WheelSuspension},
-        ColliderHandle, ColliderProperties, RigidBodyHandle, SetRigidBodyProperties, Transform,
+        ColliderHandle, ColliderProperties, RigidBodyHandle, SetRigidBodyProperties,
     },
+    util::Transform,
 };
 use std::collections::HashMap;
 
@@ -37,10 +38,7 @@ impl Body {
             self.body,
             physics.shape_cache.unit_cube,
             &ColliderProperties {
-                local_transform: Transform {
-                    rotation: block.orientation(),
-                    translation: pos.as_vec3(),
-                },
+                local_transform: Transform::new(pos.as_vec3(), block.orientation()),
                 // again, my ass
                 friction: 0.8,
                 bounciness: 0.1,

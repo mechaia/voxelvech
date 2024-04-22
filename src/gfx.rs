@@ -15,7 +15,7 @@ use mechaia::{
         },
         Render, StageSetHandle,
     },
-    util::Transform,
+    util::TransformScale,
     window::Window,
 };
 
@@ -64,7 +64,7 @@ pub struct DrawCollector {
 
 pub struct DrawCollectorOne {
     instance_data: Vec<Vec<Instance>>,
-    transforms_data: Vec<Transform>,
+    transforms_data: Vec<TransformScale>,
 }
 
 impl Gfx {
@@ -424,7 +424,7 @@ impl GuiFilePicker {
 }
 
 impl DrawCollectorOne {
-    pub fn push(&mut self, mesh_id: u32, material_id: u32, transforms: &[Transform]) {
+    pub fn push(&mut self, mesh_id: u32, material_id: u32, transforms: &[TransformScale]) {
         self.instance_data[usize::try_from(mesh_id).unwrap()].push(Instance {
             transforms_offset: self.transforms_data.len().try_into().unwrap(),
             material: material_id,

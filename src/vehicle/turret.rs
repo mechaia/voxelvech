@@ -1,8 +1,8 @@
 use super::{Block, BlockSet};
 use mechaia::{
-    math::{IVec3, Quat, Vec2, Vec3, Vec3Swizzles},
+    math::{IVec3, Vec2, Vec3, Vec3Swizzles},
     model::Collection,
-    physics3d,
+    util::Transform,
 };
 
 /// Calculate turret pan and tilt to aim directly at given target in local coordinates.
@@ -33,7 +33,7 @@ pub fn calc_pan_tilt(target: Vec3, tilt_joint_offset: Vec2) -> (f32, f32) {
 }
 
 pub fn turret_model_to_world_transform(
-    vehicle_transform: &physics3d::Transform,
+    vehicle_transform: &Transform,
     pos: IVec3,
     block: &Block,
     block_set: &BlockSet,
@@ -41,40 +41,20 @@ pub fn turret_model_to_world_transform(
     pan: f32,
     tilt: f32,
     inverse: bool,
-) -> [physics3d::Transform; 3] {
+) -> [Transform; 3] {
     let armature = block_set.get_armature(block.id);
     let armature = &collection.armatures[armature as usize];
 
-    let trf_base = mechaia::model::Transform {
-        translation: Vec3::ZERO.into(),
-        rotation: Quat::IDENTITY,
-    };
-    let trf_pan = mechaia::model::Transform {
-        translation: Vec3::ZERO.into(),
-        rotation: Quat::from_rotation_y(pan),
-    };
-    let trf_tilt = mechaia::model::Transform {
-        translation: Vec3::ZERO.into(),
-        rotation: Quat::from_rotation_z(tilt),
-    };
+    let trf_base = Transform::IDENTITY;
+    let trf_pan = Transform::from_rotation_y(pan);
+    let trf_tilt = Transform::from_rotation_z(tilt);
 
-    let base = physics3d::Transform {
-        translation: pos.as_vec3(),
-        rotation: block.orientation(),
-    };
+    let base = Transform::new(pos.as_vec3(), block.orientation());
     let base = vehicle_transform.apply_to_transform(&base);
-    let base = mechaia::model::Transform {
-        translation: base.translation.into(),
-        rotation: base.rotation,
-    };
 
-    let trfs: [_; 3] = armature
+    armature
         .apply(&base, &[trf_base, trf_pan, trf_tilt], inverse)
         .into_vec()
         .try_into()
-        .unwrap();
-    trfs.map(|t| physics3d::Transform {
-        translation: t.translation.into(),
-        rotation: t.rotation,
-    })
+        .unwrap()
 }

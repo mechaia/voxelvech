@@ -1,4 +1,4 @@
-use std::{collections::VecDeque, sync::Mutex, time::Instant};
+use std::{collections::VecDeque, sync::Mutex};
 
 const MAX_LINES: usize = 128;
 

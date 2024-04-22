@@ -6,14 +6,12 @@ mod player;
 mod time;
 mod vehicle;
 
-use core::iter;
 use mechaia::{
     input,
-    math::{EulerRot, IVec3, Quat, UVec2, Vec2, Vec3},
-    physics3d,
+    math::{IVec3, Quat, Vec3},
+    util::Transform,
 };
 use std::{
-    collections::HashMap,
     io::{self, Write},
     time::{Duration, Instant, SystemTime},
 };
@@ -312,10 +310,7 @@ fn main() {
                     match std::fs::read_to_string(&p) {
                         Ok(s) => {
                             vehicle.load_v0_text(&block_set, &mut physics, &s);
-                            vehicle.set_transform(
-                                &mut physics,
-                                &mechaia::physics3d::Transform::IDENTITY,
-                            );
+                            vehicle.set_transform(&mut physics, &Transform::IDENTITY);
                             log::success("loaded vehicle");
                             gfx.gui.data.show = None;
                             save_timeout = None;
@@ -375,7 +370,7 @@ fn main() {
 
                 let trf = vehicle.transform(&physics);
                 let trfs = (0..trf_count)
-                    .map(|_| mechaia::util::Transform {
+                    .map(|_| mechaia::util::TransformScale {
                         translation: trf.apply_to_translation(pos.as_vec3()),
                         rotation: trf.rotation * blk.orientation(),
                         scale: 1.0,
@@ -386,24 +381,16 @@ fn main() {
             physics.render(collector);
 
             for (trf, len) in projectiles.iter() {
-                let trf: &mechaia::physics3d::Transform = trf;
                 let len: &f32 = len;
 
                 let model = &collection.models[projectile_model as usize];
                 let mesh = model.mesh_index;
                 let armature = &collection.armatures[model.armature_index];
-                let trf = mechaia::model::Transform {
-                    translation: trf.translation.into(),
-                    rotation: trf.rotation,
-                };
-                let tail_trf = mechaia::model::Transform::IDENTITY;
-                let head_trf = mechaia::model::Transform {
-                    translation: (Vec3::Y * *len).into(),
-                    rotation: Quat::IDENTITY,
-                };
+                let tail_trf = Transform::IDENTITY;
+                let head_trf = Transform::IDENTITY.with_translation(Vec3::Y * *len);
                 let trfs = armature.apply(&trf, &[tail_trf, head_trf], true);
                 let trfs: [_; 2] = trfs.into_vec().try_into().unwrap();
-                let trfs = trfs.map(|x| mechaia::util::Transform {
+                let trfs = trfs.map(|x| mechaia::util::TransformScale {
                     translation: x.translation.into(),
                     rotation: x.rotation,
                     scale: 1.0,
@@ -415,13 +402,7 @@ fn main() {
         if physics_watch.delta_now() >= physics.engine.time_delta() {
             if gfx.gui.data.show.is_none() {
                 if f("editor.vehicle.reset") != 0.0 {
-                    vehicle.set_transform(
-                        &mut physics,
-                        &mechaia::physics3d::Transform {
-                            translation: Vec3::ZERO,
-                            rotation: Quat::IDENTITY,
-                        },
-                    );
+                    vehicle.set_transform(&mut physics, &Transform::IDENTITY);
                 }
 
                 projectiles = vehicle.set_input_controls(
