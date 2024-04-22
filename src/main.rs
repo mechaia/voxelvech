@@ -114,6 +114,26 @@ impl Autosaver {
 fn main() {
     let collection = load_collection();
 
+    let projectile_model = 'a: {
+        for root in collection.scenes.iter() {
+            for node in root.descendants() {
+                if let Some(name) = node
+                    .properties()
+                    .name
+                    .as_ref()
+                    .filter(|n| &***n == "projectile.laser0")
+                {
+                    let mechaia::model::Node::Leaf { model, .. } = node else {
+                        panic!("todo: handle multi-mesh blocks (or not?)");
+                    };
+                    break 'a *model;
+                }
+            }
+        }
+        panic!("no projectile model");
+    };
+    assert_ne!(projectile_model, usize::MAX);
+
     let block_set = vehicle::BlockSet::from_collection(&collection);
 
     let mut physics = Physics::new(&collection);
@@ -153,6 +173,8 @@ fn main() {
     let save_timeout_thresh = 60.0;
 
     let mut autosaver = Autosaver::init(3);
+
+    let mut projectiles = Vec::new();
 
     log::info("System online");
 
@@ -362,6 +384,32 @@ fn main() {
                 collector.transparent.push(mesh, 1, &trfs);
             }
             physics.render(collector);
+
+            for (trf, len) in projectiles.iter() {
+                let trf: &mechaia::physics3d::Transform = trf;
+                let len: &f32 = len;
+
+                let model = &collection.models[projectile_model as usize];
+                let mesh = model.mesh_index;
+                let armature = &collection.armatures[model.armature_index];
+                let trf = mechaia::model::Transform {
+                    translation: trf.translation.into(),
+                    rotation: trf.rotation,
+                };
+                let tail_trf = mechaia::model::Transform::IDENTITY;
+                let head_trf = mechaia::model::Transform {
+                    translation: (Vec3::Y * *len).into(),
+                    rotation: Quat::IDENTITY,
+                };
+                let trfs = armature.apply(&trf, &[tail_trf, head_trf], true);
+                let trfs: [_; 2] = trfs.into_vec().try_into().unwrap();
+                let trfs = trfs.map(|x| mechaia::util::Transform {
+                    translation: x.translation.into(),
+                    rotation: x.rotation,
+                    scale: 1.0,
+                });
+                collector.solid.push(mesh as _, 1, &trfs)
+            }
         });
 
         if physics_watch.delta_now() >= physics.engine.time_delta() {
@@ -376,16 +424,19 @@ fn main() {
                     );
                 }
 
-                vehicle.set_input_controls(
+                projectiles = vehicle.set_input_controls(
+                    &block_set,
+                    projectile_model as u32,
+                    &collection,
                     &physics,
                     &vehicle::InputControls {
                         forward: f("vehicle.control.forward"),
                         pan: f("vehicle.control.pan"),
                         tilt: 0.0,
+                        target: player.looking_at_phys(&physics),
+                        fire: true,
                     },
                 );
-                let target = player.looking_at_phys(&physics);
-                vehicle.set_aim_target(&block_set, &collection, &physics, target);
             }
             physics_watch.sample();
             vehicle.step(&mut physics);

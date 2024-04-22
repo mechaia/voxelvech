@@ -152,7 +152,13 @@ impl Player {
     pub fn looking_at_phys(&self, physics: &Physics) -> Vec3 {
         let Mode::Free { camera } = &self.mode;
         let max_distance = 1e4;
-        let distance = physics.engine.cast_ray(camera.translation(), camera.direction() * max_distance, None)
+        let distance = physics
+            .engine
+            .cast_ray(
+                camera.translation(),
+                camera.direction() * max_distance,
+                None,
+            )
             .map_or(max_distance, |v| v.distance);
         camera.translation() + camera.direction() * distance
     }
