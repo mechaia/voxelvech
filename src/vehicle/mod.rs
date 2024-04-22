@@ -1,17 +1,26 @@
 mod physics;
+mod turret;
 
 use std::collections::HashMap;
 
 use crate::{gfx::DrawCollector, physics::Physics};
 use mechaia::{
-    math::{IVec3, Quat, Vec3},
-    model::Collection,
+    math::{IVec3, Quat, Vec2, Vec3, Vec3Swizzles},
+    model::{Collection, Transform},
     physics3d, voxel,
 };
+
+use self::turret::calc_pan_tilt;
 
 pub struct Vehicle {
     physics: physics::Body,
     voxels: voxel::common::Map<Block>,
+    turrets: HashMap<IVec3, Turret>,
+}
+
+struct Turret {
+    pan: f32,
+    tilt: f32,
 }
 
 #[derive(Default)]
@@ -29,6 +38,7 @@ pub struct BlockSet {
 struct BlockSetEntry {
     name: Box<str>,
     mesh: u32,
+    armature: u32,
 }
 
 impl BlockSet {
@@ -54,6 +64,11 @@ impl BlockSet {
                     blocks.push(BlockSetEntry {
                         name: name.clone(),
                         mesh: model.mesh_index.try_into().unwrap(),
+                        armature: if model.armature_index == usize::MAX {
+                            u32::MAX
+                        } else {
+                            model.armature_index.try_into().unwrap()
+                        }
                     });
                     name_to_id.insert(name, i);
                 }
@@ -79,6 +94,10 @@ impl BlockSet {
         self.blocks[usize::try_from(id).unwrap()].mesh
     }
 
+    pub fn get_armature(&self, id: u32) -> u32 {
+        self.blocks[usize::try_from(id).unwrap()].armature
+    }
+
     pub fn len(&self) -> usize {
         self.blocks.len()
     }
@@ -93,12 +112,19 @@ impl Vehicle {
         Self {
             physics: physics::Body::new(physics),
             voxels: voxel::common::Map::new(),
+            turrets: Default::default(),
         }
     }
 
     /// Add a block without any sanity checks.
     pub fn force_add(&mut self, physics: &mut Physics, pos: IVec3, block: Block) {
         self.physics.add(physics, pos, &block);
+        if block.id == 5 {
+            self.turrets.insert(pos, Turret {
+                pan: 0.0,
+                tilt: 0.0,
+            });
+        }
         self.voxels.insert(pos, block);
     }
 
@@ -106,6 +132,7 @@ impl Vehicle {
     pub fn force_remove(&mut self, physics: &mut Physics, pos: IVec3) {
         self.physics.remove(physics, pos);
         self.voxels.remove(pos);
+        self.turrets.remove(&pos);
     }
 
     pub fn query_ray(
@@ -124,8 +151,8 @@ impl Vehicle {
         for pos in ray.take(1024) {
             if self.voxels.get(pos).is_some() {
                 return Some(QueryRayResult {
-                    occupied: LocalWorld::from_local(pos, &trf),
-                    free: free.map(|local| LocalWorld::from_local(local, &trf)),
+                    occupied: pos,
+                    free,
                 });
             }
             free = Some(pos);
@@ -140,6 +167,7 @@ impl Vehicle {
     pub fn render(
         &self,
         block_set: &BlockSet,
+        collection: &Collection,
         physics: &Physics,
         interpolation: f32,
         collector: &mut DrawCollector,
@@ -161,7 +189,9 @@ impl Vehicle {
                     .into(),
                 )
             };
-            push(pos.as_vec3(), blk.orientation());
+            if blk.id != 5 {
+                push(pos.as_vec3(), blk.orientation());
+            }
             // FIXME
             if blk.id == 4 {
                 let w = *self.physics.pos_to_wheel.get(&pos).unwrap();
@@ -171,6 +201,39 @@ impl Vehicle {
                 let tire = start_tire.interpolate(&end_tire, interpolation);
                 push(axle.translation, axle.rotation);
                 push(tire.translation, tire.rotation);
+            } else if blk.id == 5 {
+                let armature = block_set.get_armature(blk.id);
+                let armature = &collection.armatures[armature as usize];
+                let turret = self.turrets.get(&pos).unwrap();
+                let trf_base = mechaia::model::Transform {
+                    //translation: pos.as_vec3a(),
+                    //rotation: blk.orientation(),
+                    translation: Vec3::ZERO.into(),
+                    rotation: Quat::IDENTITY,
+                };
+                let trf_pan = mechaia::model::Transform {
+                    translation: Vec3::ZERO.into(),
+                    rotation: Quat::from_rotation_y(turret.pan),
+                };
+                let trf_tilt = mechaia::model::Transform {
+                    translation: Vec3::ZERO.into(),
+                    rotation: Quat::from_rotation_z(turret.tilt),
+                };
+                let base = mechaia::model::Transform {
+                    translation: pos.as_vec3a(),
+                    rotation: blk.orientation(),
+                };
+                let [trf_base, trf_pan, trf_tilt] = armature.apply(&base, &[trf_base, trf_pan, trf_tilt], true).into_vec().try_into().unwrap();
+                let f = |t: mechaia::model::Transform| physics3d::Transform {
+                    translation: t.translation.into(),
+                    rotation: t.rotation,
+                };
+                let trf_base = f(trf_base);
+                let trf_pan = f(trf_pan);
+                let trf_tilt = f(trf_tilt);
+                push(trf_base.translation.into(), trf_base.rotation);
+                push(trf_pan.translation.into(), trf_pan.rotation);
+                push(trf_tilt.translation.into(), trf_tilt.rotation);
             }
             let mesh = block_set.get_mesh(blk.id);
             collector.solid.push(mesh, 0, &trfs)
@@ -207,27 +270,33 @@ impl Vehicle {
             self.physics.vehicle_body.set_wheel_brake(w, brake);
         }
     }
+
+    pub fn set_aim_target(&mut self, block_set: &BlockSet, collection: &Collection, physics: &Physics, target: Vec3) {
+        let trf = self.physics.transform(physics);
+        let target = trf.apply_to_translation_inv(target);
+
+        for (&pos, turret) in self.turrets.iter_mut() {
+            let blk = self.voxels.get(pos).unwrap();
+            let trf = mechaia::physics3d::Transform {
+                translation: pos.as_vec3(),
+                rotation: blk.orientation(),
+            };
+            let target = trf.apply_to_translation_inv(target);
+
+            let armature = block_set.get_armature(blk.id);
+            let armature = &collection.armatures[armature as usize];
+            let trfs = armature.apply(&Transform::IDENTITY, &[Transform::IDENTITY; 3], false);
+            let tilt_joint_offset = trfs[2].translation.xz();
+
+            (turret.pan, turret.tilt) = calc_pan_tilt(target, tilt_joint_offset);
+        }
+    }
 }
 
 pub struct QueryRayResult {
-    pub occupied: LocalWorld,
+    pub occupied: IVec3,
     /// May be none if the ray started inside an object.
-    pub free: Option<LocalWorld>,
-}
-
-pub struct LocalWorld {
-    pub local: IVec3,
-    pub world: Vec3,
-}
-
-impl LocalWorld {
-    fn from_local(local: IVec3, local_to_world: &physics3d::Transform) -> Self {
-        let trf = local_to_world;
-        Self {
-            local,
-            world: (trf.rotation * local.as_vec3()) + trf.translation,
-        }
-    }
+    pub free: Option<IVec3>,
 }
 
 fn translation_world_to_local(world: Vec3, local_to_world: &physics3d::Transform) -> Vec3 {
@@ -315,12 +384,7 @@ impl Vehicle {
         Ok(())
     }
 
-    pub fn load_v0_text(
-        &mut self,
-        block_set: &BlockSet,
-        physics: &mut Physics,
-        text: &str,
-    ) {
+    pub fn load_v0_text(&mut self, block_set: &BlockSet, physics: &mut Physics, text: &str) {
         self.voxels.clear();
         self.physics.clear(physics);
 
@@ -340,7 +404,7 @@ impl Vehicle {
             assert!(it.next().is_none(), "garbage at end of line {i}");
 
             let blk = Block {
-                id: block_set.get_id(name).unwrap_or_else(|| { 
+                id: block_set.get_id(name).unwrap_or_else(|| {
                     crate::log::error(format!("block {name} not recognized, replacing with cube"));
                     block_set.cube_id()
                 }),

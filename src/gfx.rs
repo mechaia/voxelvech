@@ -117,12 +117,10 @@ impl Gfx {
                         input: String::new(),
                     },
                     menu: GuiMenu {
-                        entries: [
-                            "continue",
-                            "save",
-                            "load",
-                            "exit",
-                        ].into_iter().map(|s| s.to_string().into_boxed_str()).collect(),
+                        entries: ["continue", "save", "load", "exit"]
+                            .into_iter()
+                            .map(|s| s.to_string().into_boxed_str())
+                            .collect(),
                         index: 0,
                     },
                 },
@@ -188,7 +186,7 @@ impl GuiData {
         use gui::immediate::Rect;
         let log_box = Rect {
             offset: U16Vec2::new(10, 10),
-            size: U16Vec2::new(400, 160),
+            size: U16Vec2::new(640, 160),
         };
         let mut start = IVec2::from(log_box.offset);
         use crate::log;
@@ -349,10 +347,7 @@ impl GuiMenu {
     }
 
     pub fn prev_index(&mut self) {
-        self.index = self
-            .index
-            .checked_sub(1)
-            .unwrap_or(self.entries.len() - 1);
+        self.index = self.index.checked_sub(1).unwrap_or(self.entries.len() - 1);
     }
 }
 
@@ -410,6 +405,10 @@ impl GuiFilePicker {
             self.index = i;
             self.input = prefix.into();
         }
+    }
+
+    pub fn selected(&self) -> Option<&str> {
+        self.files.get(self.index).map(|s| &**s)
     }
 
     pub fn next_index(&mut self) {
@@ -502,11 +501,7 @@ fn make_pbr_stage(
 }
 
 fn common_prefix<'a>(a: &'a str, b: &'a str) -> &'a str {
-    let (a, b) = if a.len() < b.len() {
-        (b, a)
-    } else {
-        (a, b)
-    };
+    let (a, b) = if a.len() < b.len() { (b, a) } else { (a, b) };
     for (i, (x, y)) in a.bytes().zip(b.bytes()).enumerate() {
         if x != y {
             return &a[..i];

@@ -84,11 +84,7 @@ impl Autosaver {
         let move_to = format!("_autosave{}.vvt", self.next_save);
         match std::fs::rename(tmp_path, &move_to) {
             Ok(()) => {}
-            Err(e) => {
-                return log::error(format!(
-                    "failed to move {tmp_path} to {move_to}: {e}"
-                ))
-            }
+            Err(e) => return log::error(format!("failed to move {tmp_path} to {move_to}: {e}")),
         }
         log::info(format!("saved to {move_to}"));
         self.next_save = (self.next_save + 1) % self.max_saves;
@@ -118,7 +114,7 @@ impl Autosaver {
 fn main() {
     let collection = load_collection();
 
-    let mut block_set = vehicle::BlockSet::from_collection(&collection);
+    let block_set = vehicle::BlockSet::from_collection(&collection);
 
     let mut physics = Physics::new(&collection);
     let mut vehicle = vehicle::Vehicle::new(&mut physics);
@@ -140,28 +136,16 @@ fn main() {
     let mut window = mechaia::window::Window::new();
     let mut gfx = gfx::Gfx::new(&mut window, &collection);
 
-    let mut camera = camera::FreeCamera::new();
+    let mut player = player::Player::new(&block_set);
 
     let mut watch = time::StopWatch::new();
 
-    let mut trigger_place = input::TriggerEdge::default();
-    let mut trigger_remove = input::TriggerEdge::default();
-    let mut trigger_toggle = input::TriggerEdge::default();
-    let mut trigger_rotate = input::TriggerEdge::default();
-    let mut trigger_mirror_enable = input::TriggerEdge::default();
-
-    let mut trigger_toggle_menu = input::TriggerEdge::default();
     let mut trigger_esc = input::TriggerEdge::default();
 
     let mut trigger_ui_up = input::TriggerEdge::default();
     let mut trigger_ui_down = input::TriggerEdge::default();
     let mut trigger_ui_select = input::TriggerEdge::default();
     let mut trigger_ui_complete = input::TriggerEdge::default();
-
-    let mut block = vehicle::Block::new(block_set.cube_id(), 0, 0);
-
-    // I'm a fucking genius
-    let mut rot_per_dir = [0u8; 6];
 
     let mut physics_watch = time::StopWatch::new();
 
@@ -209,69 +193,22 @@ fn main() {
                 .sum()
         };
 
-        if gfx.gui.data.show.is_none() {
-            camera.add_pan(f("editor.camera.pan"));
-            camera.add_tilt(f("editor.camera.tilt"));
-            camera.translate(
-                watch.delta()
-                    * Vec3::new(
-                        f("editor.camera.forward"),
-                        f("editor.camera.sideways"),
-                        f("editor.camera.up"),
-                    ),
+        let block_ghost = if gfx.gui.data.show.is_none() {
+            let res = player.handle_inputs(
+                &block_set,
+                &mut physics,
+                &mut vehicle,
+                &inputs,
+                &window,
+                watch.delta(),
             );
-
-            block.id = (block.id + u32::from(trigger_toggle.apply(f("editor.select_block.toggle"))))
-                % block_set.len_u32();
-
-            let rot = &mut rot_per_dir[usize::from(block.direction())];
-            if block.id == 4 {
-                *rot &= 2;
-                if trigger_rotate.apply(f("editor.rotate")) {
-                    *rot = (*rot).wrapping_add(2) & 2;
-                } else if trigger_rotate.apply(-f("editor.rotate")) {
-                    *rot = (*rot).wrapping_sub(2) & 2;
-                }
-                *rot |= 1;
-            } else {
-                if trigger_rotate.apply(f("editor.rotate")) {
-                    *rot = (*rot).wrapping_add(1) & 3;
-                } else if trigger_rotate.apply(-f("editor.rotate")) {
-                    *rot = (*rot).wrapping_sub(1) & 3;
-                }
-            }
-            block.set_rotation(*rot);
-        }
-
-        let mut query = vehicle.query_ray(&physics, camera.translation(), camera.direction());
-
-        if let Some(q) = query {
-            if let Some(free) = &q.free {
-                if block.id == 4 {
-                    block.set_direction(0);
-                } else {
-                    block.set_direction(match (free.local - q.occupied.local).to_array() {
-                        [0, 0, 1] => 0,
-                        [0, 0, _] => 1,
-                        [0, 1, _] => 2,
-                        [0, _, _] => 3,
-                        [1, _, _] => 4,
-                        [_, _, _] => 5,
-                    });
-                }
-            }
-
-            if trigger_place.apply(f("editor.place")) {
-                if let Some(free) = q.free {
-                    vehicle.force_add(&mut physics, free.local, block.clone());
-                    save_timeout.get_or_insert_with(time::StopWatch::new);
-                }
-            } else if trigger_remove.apply(f("editor.remove")) {
-                vehicle.force_remove(&mut physics, q.occupied.local);
+            if res.vehicle_dirty {
                 save_timeout.get_or_insert_with(time::StopWatch::new);
             }
-            query = vehicle.query_ray(&physics, camera.translation(), camera.direction());
-        }
+            res.block_ghost
+        } else {
+            None
+        };
 
         if trigger_esc.apply(f("ui.toggle")) {
             if gfx.gui.data.show.is_some() {
@@ -291,7 +228,11 @@ fn main() {
                         fp.input_search_or_complete();
                     }
                     mechaia::window::InputKey::Unicode(c) if c.as_str() == "\n" => {}
-                    mechaia::window::InputKey::Unicode(c) => for c in c.chars() { fp.input_push(c) },
+                    mechaia::window::InputKey::Unicode(c) => {
+                        for c in c.chars() {
+                            fp.input_push(c)
+                        }
+                    }
                     mechaia::window::InputKey::Backspace => fp.input_pop(),
                     _ => {}
                 }
@@ -341,17 +282,27 @@ fn main() {
             Some(gfx::GuiShow::LoadList) => {
                 handle_file_picker();
                 if trigger_ui_select.apply(f("ui.select")) {
-                    let p = gfx.gui.data.file_picker.input();
-                    match std::fs::read_to_string(p.to_string()) {
+                    let mut p = gfx.gui.data.file_picker.input();
+                    if p.is_empty() {
+                        p = gfx.gui.data.file_picker.selected().unwrap_or("");
+                    }
+                    let p = p.to_string();
+                    match std::fs::read_to_string(&p) {
                         Ok(s) => {
                             vehicle.load_v0_text(&block_set, &mut physics, &s);
-                            vehicle.set_transform(&mut physics, &mechaia::physics3d::Transform::IDENTITY);
+                            vehicle.set_transform(
+                                &mut physics,
+                                &mechaia::physics3d::Transform::IDENTITY,
+                            );
                             log::success("loaded vehicle");
                             gfx.gui.data.show = None;
                             save_timeout = None;
+                            // set to loaded file, might differ if we special-cased to selected()
+                            gfx.gui.data.file_picker.input_clear();
+                            gfx.gui.data.file_picker.input_extend(p.chars());
                         }
                         Err(e) => {
-                            log::error(format!("error reading {p}: {e}"));
+                            log::error(format!("error reading '{p}': {e}"));
                         }
                     };
                 }
@@ -373,17 +324,17 @@ fn main() {
                             Ok(mut f) => {
                                 match vehicle.save_v0_text(&block_set, &mut |b| f.write_all(b)) {
                                     Ok(()) => {
-                                        log::success(format!("saved vehicle to {p}"));
+                                        log::success(format!("saved vehicle to '{p}'"));
                                         gfx.gui.data.show = None;
                                         save_timeout = None;
                                     }
                                     Err(e) => {
-                                        log::error(format!("error writing {p}: {e}"));
+                                        log::error(format!("error writing '{p}': {e}"));
                                     }
                                 }
                             }
                             Err(e) => {
-                                log::error(format!("error opening {p}: {e}"));
+                                log::error(format!("error opening '{p}': {e}"));
                             }
                         };
                     }
@@ -391,29 +342,24 @@ fn main() {
             }
         }
 
-        gfx.draw(&camera.to_render(window.aspect()), &mut |collector| {
+        let camera = player.camera_to_render(window.aspect());
+        gfx.draw(&camera, &mut |collector| {
             let time_frac = physics_watch.delta_now() / physics.engine.time_delta();
-            vehicle.render(&block_set, &physics, time_frac, collector);
-            if let Some(q) = query.as_ref().and_then(|q| q.free.as_ref()) {
+            vehicle.render(&block_set, &collection, &physics, time_frac, collector);
+
+            if let Some((pos, blk)) = &block_ghost {
+                let mesh = block_set.get_mesh(blk.id);
+                let trf_count = collection.meshes[mesh as usize].transform_count;
+
                 let trf = vehicle.transform(&physics);
-                let trfs = [
-                    mechaia::util::Transform {
-                        translation: q.world,
-                        rotation: trf.rotation * block.orientation(),
+                let trfs = (0..trf_count)
+                    .map(|_| mechaia::util::Transform {
+                        translation: trf.apply_to_translation(pos.as_vec3()),
+                        rotation: trf.rotation * blk.orientation(),
                         scale: 1.0,
-                    },
-                    mechaia::util::Transform {
-                        translation: q.world,
-                        rotation: trf.rotation * block.orientation(),
-                        scale: 1.0,
-                    },
-                    mechaia::util::Transform {
-                        translation: q.world,
-                        rotation: trf.rotation * block.orientation(),
-                        scale: 1.0,
-                    },
-                ];
-                collector.transparent.push(block.id.into(), 1, &trfs);
+                    })
+                    .collect::<Vec<_>>();
+                collector.transparent.push(mesh, 1, &trfs);
             }
             physics.render(collector);
         });
@@ -438,6 +384,8 @@ fn main() {
                         tilt: 0.0,
                     },
                 );
+                let target = player.looking_at_phys(&physics);
+                vehicle.set_aim_target(&block_set, &collection, &physics, target);
             }
             physics_watch.sample();
             vehicle.step(&mut physics);

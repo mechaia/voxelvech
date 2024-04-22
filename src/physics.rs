@@ -121,7 +121,7 @@ fn add_objects(
             _ => todo!("{ty}"),
         };
         let properties = &ColliderProperties {
-            local_transform: dbg!(*transform),
+            local_transform: *transform,
             // numbers pulled from my ass
             friction: 0.8,
             bounciness: 0.05,
