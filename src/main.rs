@@ -295,6 +295,10 @@ fn main() {
                             }
                             return;
                         }
+                        "reset vehicle" => {
+                            vehicle.set_transform(&mut physics, &Transform::IDENTITY);
+                            gfx.gui.data.show = None;
+                        }
                         s => todo!("{s}"),
                     }
                 }
@@ -401,10 +405,6 @@ fn main() {
 
         if physics_watch.delta_now() >= physics.engine.time_delta() {
             if gfx.gui.data.show.is_none() {
-                if f("editor.vehicle.reset") != 0.0 {
-                    vehicle.set_transform(&mut physics, &Transform::IDENTITY);
-                }
-
                 projectiles = vehicle.set_input_controls(
                     &block_set,
                     projectile_model as u32,

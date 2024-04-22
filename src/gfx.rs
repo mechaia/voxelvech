@@ -117,7 +117,7 @@ impl Gfx {
                         input: String::new(),
                     },
                     menu: GuiMenu {
-                        entries: ["continue", "save", "load", "exit"]
+                        entries: ["continue", "reset vehicle", "save", "load", "exit"]
                             .into_iter()
                             .map(|s| s.to_string().into_boxed_str())
                             .collect(),

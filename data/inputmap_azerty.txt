@@ -17,7 +17,6 @@ ui.up                         :arrowup           0 1            0 1
 ui.down                       :arrowdown         0 1            0 1
 ui.select                     :enter             0 1            0 1
 ui.complete                   :arrowright        0 1            0 1
-editor.vehicle.reset          v                  0 1            0 1
 vehicle.control.forward       u                  0 1            0 1
 vehicle.control.forward       j                  0 1            0 -1
 vehicle.control.pan           h                  0 1            0 -1
