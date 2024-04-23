@@ -1,4 +1,4 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 
 use mechaia::math::IVec3;
 
@@ -32,8 +32,10 @@ pub struct DamageAccumulator {
 impl Body {
     /// Insert a new block with full hitpoints
     ///
-    /// This does NOT check if a block is already present.
-    pub fn insert(&mut self, block_set: &BlockSet, pos: IVec3, block: Block, is_core: bool) {
+    /// It check if
+    /// - whether a block was already present. If so, the function panics.
+    /// - the new block is a core. If a core is already present, the function panics.
+    pub fn insert(&mut self, block_set: &BlockSet, pos: IVec3, block: Block) {
         let meta = &block_set[block.id];
         let value = (meta.health, Vec::from([pos]).into(), block.id);
         let i = if let Some(i) = self.free_blocks_slots.pop() {
@@ -44,9 +46,9 @@ impl Body {
             (self.blocks.len() - 1).try_into().unwrap()
         };
         let prev = self.voxels.insert(pos, i);
-        debug_assert!(prev.is_none());
-        if is_core {
-            debug_assert!(!self.has_core());
+        assert!(prev.is_none());
+        if Self::is_core(block_set, block.id) {
+            assert!(!self.has_core());
             self.core = i;
         }
     }
@@ -85,6 +87,11 @@ impl Body {
         let i = *self.voxels.get(&pos).unwrap();
         *self.blocks.get(usize::try_from(i).unwrap()).unwrap().0
     }
+
+    /// Does a block qualify as core?
+    pub fn is_core(block_set: &BlockSet, block_id: u32) -> bool {
+        block_set[block_id].name.starts_with("core.")
+    }
 }
 
 impl Default for Body {
@@ -105,9 +112,7 @@ impl DamageAccumulator {
 
     /// Apply damage.
     pub fn apply(self, body: &mut Body) {
-        let mut destroyed_voxels = Vec::new();
-
-        for (start, mut dmg) in self.heat {
+        for &(start, mut dmg) in &self.heat {
             crate::log::debug(format!("applying {dmg} heat"));
             let mut visit = VecDeque::from([start]);
             while let (true, Some(pos)) = (dmg > 0, visit.pop_front()) {
@@ -125,17 +130,57 @@ impl DamageAccumulator {
 
                 if hp == 0 {
                     for &p in blk.1.iter() {
-                        destroyed_voxels.push(p);
-                        for v in [[1, 0, 0], [0, 1, 0], [0, 0, 1]] {
-                            // TODO should we dedup?
-                            visit.push_back(p + IVec3::from_array(v));
-                            visit.push_back(p - IVec3::from_array(v));
+                        for d in [IVec3::X, IVec3::Y, IVec3::Z] {
+                            visit.push_back(p + d);
+                            visit.push_back(p - d);
                         }
                     }
                 }
             }
         }
 
-        // TODO destroy disconnected
+        self.destroy_disconnected(body)
+    }
+
+    fn destroy_disconnected(self, body: &mut Body) {
+        // do a floodfill starting from the core
+        // this has (much) worse average-case runtime, but better worst-case runtime,
+        // so less likely to cause lagspikes
+        // (it is also very simple)
+        if body.core == u32::MAX {
+            crate::log::warn("no core, won't attempt disconnection");
+            return;
+        }
+        let core_positions = body.blocks.get(usize::try_from(body.core).unwrap()).unwrap().1;
+        // collect indices instead of positions to
+        // - save a bit of memory
+        // - faster processing of block list (last loop)
+        // it might bloat the queue though
+        let mut fill = HashSet::from([body.core]);
+        // both BFS (queue) and DFS (stack) work, but BFS will use less memory
+        let mut queue = VecDeque::from([body.core]);
+        while let Some(i) = queue.pop_front() {
+            for &pos in body.blocks.get(usize::try_from(i).unwrap()).unwrap().1.iter() {
+                for d in [IVec3::X, IVec3::Y, IVec3::Z, -IVec3::X, -IVec3::Y, -IVec3::Z] {
+                    let v = pos + d;
+                    let Some(&k) = body.voxels.get(&v) else { continue };
+                    if fill.contains(&k) {
+                        continue;
+                    }
+                    let blk = body.blocks.get(usize::try_from(k).unwrap()).unwrap();
+                    if *blk.0 == 0 {
+                        continue;
+                    }
+                    fill.insert(k);
+                    queue.push_back(k);
+                }
+            }
+        }
+        
+        for (i, (hp, _, _)) in body.blocks.iter_mut().enumerate() {
+            if !fill.contains(&u32::try_from(i).unwrap()) {
+                *hp = 0;
+            }
+        }
     }
 }

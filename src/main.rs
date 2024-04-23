@@ -11,6 +11,7 @@ use mechaia::{
     math::{IVec3, Quat, Vec3},
     util::Transform,
 };
+use vehicle::BlockSet;
 use std::{
     io::{self, Write},
     time::{Duration, Instant, SystemTime},
@@ -109,6 +110,19 @@ impl Autosaver {
     }
 }
 
+fn default_vehicle(physics: &mut Physics, block_set: &BlockSet) -> vehicle::Vehicle {
+    let mut vehicle = vehicle::Vehicle::new(physics);
+
+    vehicle.force_add(
+        physics,
+        block_set,
+        IVec3::ZERO,
+        vehicle::Block::new(block_set.cube_id(), 0, 0),
+    );
+
+    vehicle
+}
+
 fn main() {
     let collection = load_collection();
 
@@ -132,17 +146,11 @@ fn main() {
     };
     assert_ne!(projectile_model, usize::MAX);
 
-    let block_set = vehicle::BlockSet::from_collection(&collection);
+    let block_set = BlockSet::from_collection(&collection);
 
     let mut physics = Physics::new(&collection);
-    let mut vehicle = vehicle::Vehicle::new(&mut physics);
 
-    vehicle.force_add(
-        &mut physics,
-        &block_set,
-        IVec3::ZERO,
-        vehicle::Block::new(block_set.cube_id(), 0, 0),
-    );
+    let mut vehicle = default_vehicle(&mut physics, &block_set);
 
     let inputs = {
         let cfg = DEFAULT_INPUT_MAP;

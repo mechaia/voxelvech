@@ -134,6 +134,11 @@ impl Vehicle {
 
     /// Add a block without any sanity checks.
     pub fn force_add(&mut self, physics: &mut Physics, block_set: &BlockSet, pos: IVec3, block: Block) {
+        if damage::Body::is_core(block_set, block.id) && self.damage.has_core() {
+            crate::log::warn("vehicle already has a core");
+            return;
+        }
+
         self.physics.add(physics, pos, &block);
         if block.id == 5 {
             self.turrets.insert(
@@ -145,7 +150,7 @@ impl Vehicle {
             );
         }
         self.voxels.insert(pos, block);
-        self.damage.insert(block_set, pos, block, false);
+        self.damage.insert(block_set, pos, block);
     }
 
     /// Remove a block without any sanity checks.

@@ -103,6 +103,8 @@ impl Player {
                         *rot = (*rot).wrapping_sub(2) & 2;
                     }
                     *rot |= 1;
+                } else if is_core(block_set, self.block_id) {
+                    *rot = 0;
                 } else {
                     if self.triggers.rotate.apply(f("editor.rotate")) {
                         *rot = (*rot).wrapping_add(1) & 3;
@@ -180,6 +182,7 @@ impl Player {
     fn direction(&self, block_set: &BlockSet, occupied: IVec3, free: IVec3) -> u8 {
         match (free - occupied).to_array() {
             _ if is_wheel(block_set, self.block_id) => 0,
+            _ if is_core(block_set, self.block_id) => 0,
             [0, 0, 1] => 0,
             [0, 0, _] => 1,
             [0, 1, _] => 2,
@@ -192,4 +195,8 @@ impl Player {
 
 fn is_wheel(block_set: &BlockSet, block_id: u32) -> bool {
     block_set.get_name(block_id).starts_with("wheel")
+}
+
+fn is_core(block_set: &BlockSet, block_id: u32) -> bool {
+    block_set.get_name(block_id).starts_with("core")
 }
