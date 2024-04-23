@@ -55,6 +55,7 @@ pub enum GuiShow {
     Menu,
     LoadList,
     SaveList,
+    SpawnEnemy,
 }
 
 pub struct DrawCollector {
@@ -117,7 +118,7 @@ impl Gfx {
                         input: String::new(),
                     },
                     menu: GuiMenu {
-                        entries: ["continue", "reset vehicle", "save", "load", "exit"]
+                        entries: ["continue", "reset vehicle", "spawn enemy", "remove enemies", "save", "load", "exit"]
                             .into_iter()
                             .map(|s| s.to_string().into_boxed_str())
                             .collect(),
@@ -177,6 +178,7 @@ impl Gui {
             Some(GuiShow::Menu) => self.data.draw_menu(draw, layout),
             Some(GuiShow::LoadList) => self.data.draw_file_picker(draw, layout),
             Some(GuiShow::SaveList) => self.data.draw_file_picker(draw, layout),
+            Some(GuiShow::SpawnEnemy) => self.data.draw_file_picker(draw, layout),
         }
     }
 }

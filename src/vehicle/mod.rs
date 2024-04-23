@@ -331,6 +331,10 @@ impl Vehicle {
 
         projectiles
     }
+
+    pub fn destroy(mut self, physics: &mut Physics) {
+        self.physics.destroy(physics);
+    }
 }
 
 /// Damage stuff
@@ -416,5 +420,11 @@ impl Vehicle {
             };
             self.force_add(physics, block_set, IVec3::new(x, y, z), blk);
         }
+    }
+
+    pub fn new_v0_text(block_set: &BlockSet, physics: &mut Physics, text: &str) -> Self {
+        let mut slf = Self::new(physics);
+        slf.load_v0_text(block_set, physics, text);
+        slf
     }
 }

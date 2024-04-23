@@ -120,4 +120,9 @@ impl Body {
             self.prev_wheel_transforms.remove(&w);
         }
     }
+
+    pub fn destroy(mut self, physics: &mut Physics) {
+        self.clear(physics);
+        physics.engine.destroy_rigid_body(self.body);
+    }
 }

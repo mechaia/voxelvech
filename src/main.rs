@@ -17,7 +17,7 @@ use std::{
     time::{Duration, Instant, SystemTime},
 };
 
-use crate::physics::Physics;
+use crate::{physics::Physics, vehicle::Vehicle};
 
 const DEFAULT_INPUT_MAP: &str = include_str!("../data/inputmap_azerty.txt");
 
@@ -151,6 +151,7 @@ fn main() {
     let mut physics = Physics::new(&collection);
 
     let mut vehicle = default_vehicle(&mut physics, &block_set);
+    let mut enemy_vehicles = Vec::<Vehicle>::new();
 
     let inputs = {
         let cfg = DEFAULT_INPUT_MAP;
@@ -298,6 +299,17 @@ fn main() {
                             gfx.gui.data.show = Some(gfx::GuiShow::LoadList);
                             gfx.gui.data.file_picker.set_files(autosaver.list());
                         }
+                        "spawn enemy" => {
+                            gfx.gui.data.show = Some(gfx::GuiShow::SpawnEnemy);
+                            gfx.gui.data.file_picker.set_files(autosaver.list());
+                        }
+                        "remove enemies" => {
+                            for v in enemy_vehicles.drain(..) {
+                                v.destroy(&mut physics);
+                            }
+                            log::success("enemies removed");
+                            gfx.gui.data.show = None;
+                        }
                         "exit" => {
                             if save_timeout.is_some() {
                                 autosaver.save(&mut |f| vehicle.save_v0_text(&block_set, f));
@@ -371,12 +383,39 @@ fn main() {
                     }
                 }
             }
+            Some(gfx::GuiShow::SpawnEnemy) => {
+                handle_file_picker();
+                if trigger_ui_select.apply(f("ui.select")) {
+                    let mut p = gfx.gui.data.file_picker.input();
+                    if p.is_empty() {
+                        p = gfx.gui.data.file_picker.selected().unwrap_or("");
+                    }
+                    let p = p.to_string();
+                    match std::fs::read_to_string(&p) {
+                        Ok(s) => {
+                            let mut v = Vehicle::new_v0_text(&block_set, &mut physics, &s);
+                            let pos = player.looking_at_phys(&physics);
+                            v.set_transform(&mut physics, &Transform::IDENTITY.with_translation(pos + Vec3::Z * 10.0));
+                            log::success("spawned enemy vehicle");
+                            enemy_vehicles.push(v);
+                            gfx.gui.data.show = None;
+                        }
+                        Err(e) => {
+                            log::error(format!("error reading '{p}': {e}"));
+                        }
+                    };
+                }
+            }
         }
 
         let camera = player.camera_to_render(window.aspect());
         gfx.draw(&camera, &mut |collector| {
             let time_frac = physics_watch.delta_now() / physics.engine.time_delta();
+
             vehicle.render(&block_set, &collection, &physics, time_frac, collector);
+            for v in enemy_vehicles.iter() {
+                v.render(&block_set, &collection, &physics, time_frac, collector);
+            }
 
             if let Some((pos, blk)) = &block_ghost {
                 let mesh = block_set.get_mesh(blk.id);
@@ -395,6 +434,7 @@ fn main() {
             physics.render(collector);
 
             for (trf, len) in projectiles.iter() {
+                let trf: &Transform = trf;
                 let len: &f32 = len;
 
                 let model = &collection.models[projectile_model as usize];
@@ -402,18 +442,24 @@ fn main() {
                 let armature = &collection.armatures[model.armature_index];
                 let tail_trf = Transform::IDENTITY;
                 let head_trf = Transform::IDENTITY.with_translation(Vec3::Y * *len);
-                let trfs = armature.apply(&trf, &[tail_trf, head_trf], true);
-                let trfs: [_; 2] = trfs.into_vec().try_into().unwrap();
-                let trfs = trfs.map(|x| mechaia::util::TransformScale {
-                    translation: x.translation.into(),
-                    rotation: x.rotation,
-                    scale: 1.0,
-                });
+
+                let tail_trf = trf.apply_to_transform(&tail_trf);
+                let head_trf = trf.apply_to_transform(&head_trf);
+
+                // apply directly so we don't "overshoot"
+                // the armature has a fixed length to keep things a bit simpler when modeling
+                // we need to make sure we don't add this length.
+                // easiest solution is to simply bypass the bone hierarchy
+                let tail_trf = armature.apply_direct(0, &tail_trf);
+                let head_trf = armature.apply_direct(1, &head_trf);
+
+                let trfs = [tail_trf, head_trf].map(|x| x.into());
                 collector.solid.push(mesh as _, 1, &trfs)
             }
         });
 
         if physics_watch.delta_now() >= physics.engine.time_delta() {
+            physics_watch.sample();
             if gfx.gui.data.show.is_none() {
                 projectiles = vehicle.set_input_controls(
                     &block_set,
@@ -429,8 +475,12 @@ fn main() {
                     },
                 );
             }
-            physics_watch.sample();
+
             vehicle.step(&mut physics);
+            for v in enemy_vehicles.iter_mut() {
+                v.step(&mut physics);
+            }
+
             physics.engine.step();
         }
 
