@@ -135,11 +135,12 @@ impl Player {
 
         if self.triggers.deathray_heat.apply(f("editor.deathray.heat")) && !vehicle_dirty {
             let Mode::Free { camera } = &self.mode;
-            let dmg_query = vehicle.query_ray(physics, camera.translation(), camera.direction(), true);
+            let dmg_query =
+                vehicle.query_ray(physics, camera.translation(), camera.direction(), true);
             if let Some(q) = &dmg_query {
                 let mut acc = DamageAccumulator::default();
-                acc.add_heat(q.occupied, 260);
-                vehicle.apply_damage(acc);
+                acc.add_heat(q.occupied.as_vec3(), Vec3::X, 260);
+                vehicle.apply_damage(physics, acc);
 
                 let Mode::Free { camera } = &self.mode;
                 query = vehicle.query_ray(physics, camera.translation(), camera.direction(), false);

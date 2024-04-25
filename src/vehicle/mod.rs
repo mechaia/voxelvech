@@ -10,7 +10,11 @@ use mechaia::{
     util::Transform,
     voxel,
 };
-use std::{collections::HashMap, ops::Index};
+use std::{
+    collections::HashMap,
+    ops::Index,
+    time::{Duration, Instant},
+};
 
 pub use {block::Block, damage::DamageAccumulator};
 
@@ -24,6 +28,7 @@ pub struct Vehicle {
 struct Turret {
     pan: f32,
     tilt: f32,
+    next_fire: Instant,
 }
 
 #[derive(Default)]
@@ -123,9 +128,9 @@ impl Index<u32> for BlockSet {
 }
 
 impl Vehicle {
-    pub fn new(physics: &mut Physics) -> Self {
+    pub fn new(physics: &mut Physics, user_data: u32) -> Self {
         Self {
-            physics: physics::Body::new(physics),
+            physics: physics::Body::new(physics, user_data),
             voxels: voxel::common::Map::new(),
             turrets: Default::default(),
             damage: Default::default(),
@@ -133,7 +138,13 @@ impl Vehicle {
     }
 
     /// Add a block without any sanity checks.
-    pub fn force_add(&mut self, physics: &mut Physics, block_set: &BlockSet, pos: IVec3, block: Block) {
+    pub fn force_add(
+        &mut self,
+        physics: &mut Physics,
+        block_set: &BlockSet,
+        pos: IVec3,
+        block: Block,
+    ) {
         if damage::Body::is_core(block_set, block.id) && self.damage.has_core() {
             crate::log::warn("vehicle already has a core");
             return;
@@ -146,6 +157,7 @@ impl Vehicle {
                 Turret {
                     pan: 0.0,
                     tilt: 0.0,
+                    next_fire: Instant::now(),
                 },
             );
         }
@@ -161,6 +173,18 @@ impl Vehicle {
         self.damage.remove(pos);
     }
 
+    pub fn query_ray_params(
+        &self,
+        physics: &Physics,
+        start: Vec3,
+        direction: Vec3,
+    ) -> (Vec3, Vec3) {
+        let trf = self.physics.transform(physics);
+        let start = translation_world_to_local(start, &trf) + Vec3::ONE / 2.0;
+        let direction = direction_world_to_local(direction, &trf);
+        (start, direction)
+    }
+
     pub fn query_ray(
         &mut self,
         physics: &Physics,
@@ -168,10 +192,7 @@ impl Vehicle {
         direction: Vec3,
         ignore_dead: bool,
     ) -> Option<QueryRayResult> {
-        let trf = self.physics.transform(physics);
-
-        let start = translation_world_to_local(start, &trf) + Vec3::ONE / 2.0;
-        let direction = direction_world_to_local(direction, &trf);
+        let (start, direction) = self.query_ray_params(physics, start, direction);
 
         let ray = mechaia::voxel::common::query::Ray::new(start, direction);
         let mut free = None;
@@ -214,7 +235,8 @@ impl Vehicle {
             }
 
             let mut trfs = Vec::new();
-            let mut push = |tr, rot| trfs.push(trf.apply_to_transform(&Transform::new(tr, rot)).into());
+            let mut push =
+                |tr, rot| trfs.push(trf.apply_to_transform(&Transform::new(tr, rot)).into());
             if blk.id != 5 {
                 push(pos.as_vec3(), blk.orientation());
             }
@@ -307,9 +329,14 @@ impl Vehicle {
             let model = &collection.models[projectile_model as usize];
             let mesh = model.mesh_index;
             let armature = &collection.armatures[model.armature_index];
+            let t = Instant::now();
             for (&pos, turret) in self.turrets.iter_mut() {
+                if turret.next_fire > t {
+                    continue;
+                }
+
                 let blk = self.voxels.get(pos).unwrap();
-                let t = turret::turret_model_to_world_transform(
+                let turret_trfs = turret::turret_model_to_world_transform(
                     &trf,
                     pos,
                     blk,
@@ -319,13 +346,15 @@ impl Vehicle {
                     turret.tilt,
                     false,
                 );
-                let muzzle_trf = t[2];
+                let muzzle_trf = turret_trfs[2];
                 let dir = muzzle_trf.apply_to_direction(Vec3::Y);
                 let ray = physics
                     .engine
                     .cast_ray(muzzle_trf.translation, dir * 1e3, None);
                 let dist = ray.map_or(1e3, |r| r.distance);
                 projectiles.push((muzzle_trf, dist));
+
+                turret.next_fire = t.checked_add(Duration::from_secs(1)).unwrap();
             }
         }
 
@@ -339,8 +368,11 @@ impl Vehicle {
 
 /// Damage stuff
 impl Vehicle {
-    pub fn apply_damage(&mut self, acc: DamageAccumulator) {
-        acc.apply(&mut self.damage);
+    pub fn apply_damage(&mut self, physics: &mut Physics, acc: DamageAccumulator) {
+        let destroyed = acc.apply(&mut self.damage);
+        for pos in destroyed {
+            self.physics.remove(physics, pos);
+        }
     }
 
     pub fn reset_damage(&mut self, block_set: &BlockSet) {
@@ -422,8 +454,13 @@ impl Vehicle {
         }
     }
 
-    pub fn new_v0_text(block_set: &BlockSet, physics: &mut Physics, text: &str) -> Self {
-        let mut slf = Self::new(physics);
+    pub fn new_v0_text(
+        block_set: &BlockSet,
+        physics: &mut Physics,
+        text: &str,
+        user_data: u32,
+    ) -> Self {
+        let mut slf = Self::new(physics, user_data);
         slf.load_v0_text(block_set, physics, text);
         slf
     }

@@ -22,3 +22,4 @@ vehicle.control.forward       u                  0 1            0 1
 vehicle.control.forward       j                  0 1            0 -1
 vehicle.control.pan           h                  0 1            0 -1
 vehicle.control.pan           k                  0 1            0 1
+vehicle.control.fire          t                  0 1            0 1

@@ -48,4 +48,3 @@ impl Block {
         r * Quat::from_rotation_z(FRAC_PI_2 * f32::from(self.rotation()))
     }
 }
-

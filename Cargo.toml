@@ -5,3 +5,6 @@ edition = "2021"
 
 [dependencies]
 mechaia = { path = "../engine/mechaia", features = ["voxel"] }
+
+[profile.release]
+lto = "fat"

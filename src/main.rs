@@ -11,13 +11,17 @@ use mechaia::{
     math::{IVec3, Quat, Vec3},
     util::Transform,
 };
-use vehicle::BlockSet;
 use std::{
+    collections::VecDeque,
     io::{self, Write},
     time::{Duration, Instant, SystemTime},
 };
+use vehicle::BlockSet;
 
-use crate::{physics::Physics, vehicle::Vehicle};
+use crate::{
+    physics::Physics,
+    vehicle::{DamageAccumulator, Vehicle},
+};
 
 const DEFAULT_INPUT_MAP: &str = include_str!("../data/inputmap_azerty.txt");
 
@@ -110,8 +114,12 @@ impl Autosaver {
     }
 }
 
-fn default_vehicle(physics: &mut Physics, block_set: &BlockSet) -> vehicle::Vehicle {
-    let mut vehicle = vehicle::Vehicle::new(physics);
+fn default_vehicle(
+    physics: &mut Physics,
+    block_set: &BlockSet,
+    user_data: u32,
+) -> vehicle::Vehicle {
+    let mut vehicle = vehicle::Vehicle::new(physics, user_data);
 
     vehicle.force_add(
         physics,
@@ -150,7 +158,7 @@ fn main() {
 
     let mut physics = Physics::new(&collection);
 
-    let mut vehicle = default_vehicle(&mut physics, &block_set);
+    let mut vehicle = default_vehicle(&mut physics, &block_set, 1);
     let mut enemy_vehicles = Vec::<Vehicle>::new();
 
     let inputs = {
@@ -182,7 +190,7 @@ fn main() {
 
     let mut autosaver = Autosaver::init(3);
 
-    let mut projectiles = Vec::new();
+    let mut projectiles = VecDeque::new();
 
     log::info("System online");
 
@@ -393,9 +401,13 @@ fn main() {
                     let p = p.to_string();
                     match std::fs::read_to_string(&p) {
                         Ok(s) => {
-                            let mut v = Vehicle::new_v0_text(&block_set, &mut physics, &s);
+                            let udata = (2 + enemy_vehicles.len()).try_into().unwrap();
+                            let mut v = Vehicle::new_v0_text(&block_set, &mut physics, &s, udata);
                             let pos = player.looking_at_phys(&physics);
-                            v.set_transform(&mut physics, &Transform::IDENTITY.with_translation(pos + Vec3::Z * 10.0));
+                            v.set_transform(
+                                &mut physics,
+                                &Transform::IDENTITY.with_translation(pos + Vec3::Z * 10.0),
+                            );
                             log::success("spawned enemy vehicle");
                             enemy_vehicles.push(v);
                             gfx.gui.data.show = None;
@@ -405,6 +417,13 @@ fn main() {
                         }
                     };
                 }
+            }
+        }
+
+        {
+            let t = Instant::now();
+            while projectiles.front().is_some_and(|(_, pt)| pt <= &t) {
+                projectiles.pop_front();
             }
         }
 
@@ -433,7 +452,7 @@ fn main() {
             }
             physics.render(collector);
 
-            for (trf, len) in projectiles.iter() {
+            for ((trf, len), _) in projectiles.iter() {
                 let trf: &Transform = trf;
                 let len: &f32 = len;
 
@@ -459,9 +478,19 @@ fn main() {
         });
 
         if physics_watch.delta_now() >= physics.engine.time_delta() {
+            let t = Instant::now()
+                .checked_add(Duration::from_millis(100))
+                .unwrap();
             physics_watch.sample();
+
+            let mut player_dmg = DamageAccumulator::default();
+            let mut enemy_dmg = enemy_vehicles
+                .iter()
+                .map(|_| DamageAccumulator::default())
+                .collect::<Vec<_>>();
+
             if gfx.gui.data.show.is_none() {
-                projectiles = vehicle.set_input_controls(
+                let mut proj = vehicle.set_input_controls(
                     &block_set,
                     projectile_model as u32,
                     &collection,
@@ -471,9 +500,34 @@ fn main() {
                         pan: f("vehicle.control.pan"),
                         tilt: 0.0,
                         target: player.looking_at_phys(&physics),
-                        fire: true,
+                        fire: f("vehicle.control.fire") > 0.0,
                     },
                 );
+
+                for (trf, len) in proj.iter() {
+                    let start = trf.translation;
+                    let dir = trf.rotation * Vec3::Y;
+                    if let Some(hit) = physics.engine.cast_ray(start, dir * *len, None) {
+                        match hit.user_data {
+                            0 => {}
+                            1 => {} // ignore player
+                            i => {
+                                let i = usize::try_from(i - 2).unwrap();
+                                let (start, dir) =
+                                    enemy_vehicles[i].query_ray_params(&physics, start, dir);
+                                enemy_dmg[i].add_heat(start, dir, 120);
+                            }
+                        }
+                    }
+                }
+
+                vehicle.apply_damage(&mut physics, player_dmg);
+                for (v, dmg) in enemy_vehicles.iter_mut().zip(enemy_dmg) {
+                    v.apply_damage(&mut physics, dmg);
+                }
+
+                // visual stuff
+                projectiles.extend(proj.into_iter().map(|p| (p, t)));
             }
 
             vehicle.step(&mut physics);

@@ -1,8 +1,6 @@
-use std::collections::{HashMap, HashSet, VecDeque};
-
-use mechaia::math::IVec3;
-
 use super::{Block, BlockSet};
+use mechaia::math::{IVec3, Vec3};
+use std::collections::{HashMap, HashSet, VecDeque};
 
 /// Voxel body to assist with damage simulations.
 pub struct Body {
@@ -26,7 +24,7 @@ pub struct DamageAccumulator {
     /// "heat" damage.
     ///
     /// Damage will spread to nearest blocks first, using broad-first-search.
-    heat: Vec<(IVec3, u32)>,
+    heat: Vec<(Vec3, Vec3, u32)>,
 }
 
 impl Body {
@@ -106,17 +104,37 @@ impl Default for Body {
 }
 
 impl DamageAccumulator {
-    pub fn add_heat(&mut self, start: IVec3, damage: u32) {
-        self.heat.push((start, damage));
+    pub fn add_heat(&mut self, start: Vec3, direction: Vec3, damage: u32) {
+        self.heat.push((start, direction, damage));
     }
 
     /// Apply damage.
-    pub fn apply(self, body: &mut Body) {
-        for &(start, mut dmg) in &self.heat {
-            crate::log::debug(format!("applying {dmg} heat"));
-            let mut visit = VecDeque::from([start]);
-            while let (true, Some(pos)) = (dmg > 0, visit.pop_front()) {
-                let Some(&i) = body.voxels.get(&pos) else { continue };
+    ///
+    /// Returns positions of destroyed blocks.
+    pub fn apply(mut self, body: &mut Body) -> Vec<IVec3> {
+        let mut destroyed = Vec::new();
+        self.apply_heat(body, &mut destroyed);
+        self.destroy_disconnected(body, &mut destroyed);
+        destroyed
+    }
+
+    fn apply_heat(&mut self, body: &mut Body, destroyed: &mut Vec<IVec3>) {
+        let mut visit = VecDeque::new();
+        for (start, dir, mut dmg) in self.heat.drain(..) {
+            visit.clear();
+
+            // do query to find actual start point
+            let ray = mechaia::voxel::common::query::Ray::new(start, dir);
+            for pos in ray.take(128) {
+                if let Some(&i) = body.voxels.get(&pos) {
+                    if *body.blocks.get(usize::try_from(i).unwrap()).unwrap().0 > 0 {
+                        visit.push_back(i);
+                        break;
+                    }
+                }
+            }
+
+            while let (true, Some(i)) = (dmg > 0, visit.pop_front()) {
                 let blk = body.blocks.get_mut(usize::try_from(i).unwrap()).unwrap();
 
                 if *blk.0 == 0 {
@@ -125,33 +143,46 @@ impl DamageAccumulator {
 
                 let hp = blk.0.saturating_sub(dmg);
                 dmg -= *blk.0 - hp;
-                crate::log::debug(format!("ouch {} -> {hp} (remaining: {dmg})", blk.0));
                 *blk.0 = hp;
 
                 if hp == 0 {
+                    // TODO one or all positions?
+                    destroyed.extend(blk.1.iter().copied());
                     for &p in blk.1.iter() {
-                        for d in [IVec3::X, IVec3::Y, IVec3::Z] {
-                            visit.push_back(p + d);
-                            visit.push_back(p - d);
+                        for d in [
+                            IVec3::X,
+                            IVec3::Y,
+                            IVec3::Z,
+                            -IVec3::X,
+                            -IVec3::Y,
+                            -IVec3::Z,
+                        ] {
+                            let Some(&k) = body.voxels.get(&(p + d)) else {
+                                continue;
+                            };
+                            visit.push_back(k);
                         }
                     }
                 }
             }
         }
-
-        self.destroy_disconnected(body)
     }
 
-    fn destroy_disconnected(self, body: &mut Body) {
+    fn destroy_disconnected(self, body: &mut Body, destroyed: &mut Vec<IVec3>) {
         // do a floodfill starting from the core
         // this has (much) worse average-case runtime, but better worst-case runtime,
         // so less likely to cause lagspikes
         // (it is also very simple)
         if body.core == u32::MAX {
-            crate::log::warn("no core, won't attempt disconnection");
+            // TODO spam
+            //crate::log::warn("no core, won't attempt disconnection");
             return;
         }
-        let core_positions = body.blocks.get(usize::try_from(body.core).unwrap()).unwrap().1;
+
+        let core = body
+            .blocks
+            .get(usize::try_from(body.core).unwrap())
+            .unwrap();
         // collect indices instead of positions to
         // - save a bit of memory
         // - faster processing of block list (last loop)
@@ -159,27 +190,51 @@ impl DamageAccumulator {
         let mut fill = HashSet::from([body.core]);
         // both BFS (queue) and DFS (stack) work, but BFS will use less memory
         let mut queue = VecDeque::from([body.core]);
-        while let Some(i) = queue.pop_front() {
-            for &pos in body.blocks.get(usize::try_from(i).unwrap()).unwrap().1.iter() {
-                for d in [IVec3::X, IVec3::Y, IVec3::Z, -IVec3::X, -IVec3::Y, -IVec3::Z] {
-                    let v = pos + d;
-                    let Some(&k) = body.voxels.get(&v) else { continue };
-                    if fill.contains(&k) {
-                        continue;
+        // if core is dead, skip all
+        // next loop will set all health to 0
+        if *core.0 > 0 {
+            while let Some(i) = queue.pop_front() {
+                for &pos in body
+                    .blocks
+                    .get(usize::try_from(i).unwrap())
+                    .unwrap()
+                    .1
+                    .iter()
+                {
+                    for d in [
+                        IVec3::X,
+                        IVec3::Y,
+                        IVec3::Z,
+                        -IVec3::X,
+                        -IVec3::Y,
+                        -IVec3::Z,
+                    ] {
+                        let v = pos + d;
+                        let Some(&k) = body.voxels.get(&v) else {
+                            continue;
+                        };
+                        if fill.contains(&k) {
+                            continue;
+                        }
+                        let blk = body.blocks.get(usize::try_from(k).unwrap()).unwrap();
+                        if *blk.0 == 0 {
+                            continue;
+                        }
+                        fill.insert(k);
+                        queue.push_back(k);
                     }
-                    let blk = body.blocks.get(usize::try_from(k).unwrap()).unwrap();
-                    if *blk.0 == 0 {
-                        continue;
-                    }
-                    fill.insert(k);
-                    queue.push_back(k);
                 }
             }
         }
-        
-        for (i, (hp, _, _)) in body.blocks.iter_mut().enumerate() {
+
+        for (i, (hp, pos, _)) in body.blocks.iter_mut().enumerate() {
+            if *hp == 0 {
+                continue;
+            }
             if !fill.contains(&u32::try_from(i).unwrap()) {
                 *hp = 0;
+                // TODO one or all positions?
+                destroyed.extend(pos.iter().copied());
             }
         }
     }

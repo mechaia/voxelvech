@@ -10,7 +10,7 @@ use mechaia::{
 };
 use std::collections::HashMap;
 
-pub struct Body {
+pub(super) struct Body {
     body: RigidBodyHandle,
     colliders: HashMap<IVec3, ColliderHandle>,
     pub(super) pos_to_wheel: HashMap<IVec3, WheelHandle>,
@@ -18,10 +18,12 @@ pub struct Body {
 
     pub(super) prev_transform: Transform,
     pub(super) prev_wheel_transforms: HashMap<WheelHandle, (Transform, Transform)>,
+
+    pub(super) user_data: u32,
 }
 
 impl Body {
-    pub fn new(physics: &mut Physics) -> Self {
+    pub fn new(physics: &mut Physics, user_data: u32) -> Self {
         Self {
             body: physics.engine.make_dynamic_rigid_body(),
             colliders: Default::default(),
@@ -30,6 +32,8 @@ impl Body {
 
             prev_transform: Transform::IDENTITY,
             prev_wheel_transforms: Default::default(),
+
+            user_data,
         }
     }
 
@@ -42,7 +46,7 @@ impl Body {
                 // again, my ass
                 friction: 0.8,
                 bounciness: 0.1,
-                user_data: 0,
+                user_data: self.user_data,
             },
         );
         self.colliders.insert(pos, h);
