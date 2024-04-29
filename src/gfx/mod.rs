@@ -16,7 +16,7 @@ use mechaia::{
         },
         Render, StageSetHandle,
     },
-    util::TransformScale,
+    util::{Arena, ArenaHandle, TransformScale},
     window::Window,
 };
 
@@ -27,9 +27,15 @@ pub struct Gfx {
     pub stage_set: StageSetHandle,
     gui: gui::Gui,
     font: FontMap,
-    mesh_sets: Vec<Shared<MeshSet>>,
+    mesh_sets: Arena<MeshSetInfo>,
     textures: Vec<Shared<Texture>>,
     texture_views: Vec<Shared<TextureView>>,
+}
+
+struct MeshSetInfo {
+    set_len: usize,
+    solid_handle: standard3d::MeshSetHandle,
+    transparent_handle: standard3d::MeshSetHandle,
 }
 
 pub struct DrawCollector {
@@ -42,7 +48,7 @@ pub struct DrawCollectorOne {
     // The horror!
     //
     // per mesh set -> per mesh -> per instance
-    instance_data: Vec<Vec<Vec<Instance>>>,
+    instance_data: Vec<(MeshSetHandle, Vec<Vec<Instance>>)>,
     transforms_data: Vec<TransformScale>,
 }
 
@@ -52,8 +58,8 @@ pub struct Draw<'a> {
     pub font: &'a FontMap,
 }
 
-#[derive(Clone, Copy)]
-pub struct MeshSetHandle(u16);
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct MeshSetHandle(ArenaHandle);
 
 impl Gfx {
     pub fn new(window: &mut Window) -> Self {
@@ -62,7 +68,7 @@ impl Gfx {
             mechaia::render::Render::new(a, b)
         };
 
-        let mut render_pass = RenderPass::builder(&mut render);
+        let mut render_pass = RenderPass::builder();
 
         let tex_white = 0;
         let mut material_set = PbrMaterialSet::new(&mut render, 32);
@@ -193,7 +199,7 @@ impl Gfx {
     }
 
     pub fn add_mesh_set(&mut self, collection: &Collection) -> MeshSetHandle {
-        let mesh_set = MeshSet::new(
+        let set = MeshSet::new(
             &mut self.render,
             &collection
                 .meshes
@@ -204,14 +210,29 @@ impl Gfx {
                 })
                 .collect::<Vec<_>>(),
         );
-        let mesh_set = Shared::new(mesh_set);
-        self.pbr_solid
-            .add_mesh_set(&mut self.render, mesh_set.clone());
-        self.pbr_transparent
-            .add_mesh_set(&mut self.render, mesh_set.clone());
-        self.mesh_sets.push(mesh_set);
+        let set = Shared::new(set);
+        let set_len = set.len();
+        let solid_handle = self.pbr_solid.add_mesh_set(&mut self.render, set.clone());
+        let transparent_handle = self.pbr_transparent.add_mesh_set(&mut self.render, set);
         self.render.rerecord_commands(self.stage_set);
-        MeshSetHandle((self.mesh_sets.len() - 1).try_into().unwrap())
+        let h = self.mesh_sets.insert(MeshSetInfo {
+            set_len,
+            solid_handle,
+            transparent_handle,
+        });
+        MeshSetHandle(h)
+    }
+
+    pub fn remove_mesh_set(&mut self, mesh_set: MeshSetHandle) {
+        let info = self
+            .mesh_sets
+            .remove(mesh_set.0)
+            .expect("no mesh set with handle");
+        self.pbr_solid
+            .remove_mesh_set(&mut self.render, info.solid_handle);
+        self.pbr_transparent
+            .remove_mesh_set(&mut self.render, info.transparent_handle);
+        self.render.rerecord_commands(self.stage_set);
     }
 
     pub fn draw(&mut self, camera: &CameraView, f: &mut dyn FnMut(&mut Draw<'_>)) {
@@ -220,7 +241,12 @@ impl Gfx {
                 instance_data: self
                     .mesh_sets
                     .iter()
-                    .map(|s| (0..s.len()).map(|_| Vec::new()).collect())
+                    .map(|(k, v)| {
+                        (
+                            MeshSetHandle(k),
+                            (0..v.set_len).map(|_| Vec::new()).collect(),
+                        )
+                    })
                     .collect(),
                 transforms_data: Vec::new(),
             };
@@ -246,10 +272,15 @@ impl Gfx {
                     &coll
                         .instance_data
                         .iter()
-                        .flat_map(|v| v)
+                        .flat_map(|(_, v)| v)
                         .map(|v| u32::try_from(v.len()).unwrap())
                         .collect::<Vec<_>>(),
-                    &mut coll.instance_data.iter().flat_map(|v| v).flatten().copied(),
+                    &mut coll
+                        .instance_data
+                        .iter()
+                        .flat_map(|(_, v)| v)
+                        .flatten()
+                        .copied(),
                 );
                 pbr.set_directional_light(index, Vec3::NEG_ONE.normalize(), Vec3::ONE * 5.0);
                 pbr.set_camera(index, camera);
@@ -270,12 +301,15 @@ impl DrawCollectorOne {
         material_id: u32,
         transforms: &[TransformScale],
     ) {
-        self.instance_data[usize::from(mesh_set.0)][usize::try_from(mesh_id).unwrap()].push(
-            Instance {
-                transforms_offset: self.transforms_data.len().try_into().unwrap(),
-                material: material_id,
-            },
-        );
+        let (_, v) = self
+            .instance_data
+            .iter_mut()
+            .find(|(k, _)| *k == mesh_set)
+            .expect("no mesh set with handle");
+        v[usize::try_from(mesh_id).unwrap()].push(Instance {
+            transforms_offset: self.transforms_data.len().try_into().unwrap(),
+            material: material_id,
+        });
         self.transforms_data.extend_from_slice(transforms);
     }
 }

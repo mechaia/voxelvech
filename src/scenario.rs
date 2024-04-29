@@ -66,7 +66,11 @@ impl World {
         }
     }
 
-    pub fn destroy(self, physics: &mut Physics, gfx: &mut Gfx) {}
+    pub fn destroy(self, physics: &mut Physics, gfx: &mut Gfx) {
+        // TODO clean up physics?
+
+        gfx.remove_mesh_set(self.mesh_set);
+    }
 }
 
 fn add_objects(

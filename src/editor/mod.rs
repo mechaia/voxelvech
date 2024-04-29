@@ -514,6 +514,7 @@ impl Scenario for Editor {
             self.autosaver
                 .save(&mut |f| self.player_vehicle.save_v0_text(&state.block_set, f));
         }
+        self.world.destroy(&mut self.physics, gfx);
     }
 }
 
