@@ -947,6 +947,7 @@ dependencies = [
  "ash",
  "glam",
  "mechaia_render",
+ "mechaia_util",
  "vk-shader-macros",
 ]
 

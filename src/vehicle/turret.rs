@@ -1,6 +1,6 @@
 use super::{Block, BlockSet};
 use mechaia::{
-    math::{IVec3, Vec2, Vec3, Vec3Swizzles},
+    math::{IVec3, Quat, Vec2, Vec3, Vec3Swizzles},
     model::Collection,
     util::Transform,
 };
@@ -33,23 +33,22 @@ pub fn calc_pan_tilt(target: Vec3, tilt_joint_offset: Vec2) -> (f32, f32) {
 }
 
 pub fn turret_model_to_world_transform(
+    state: &crate::State,
     vehicle_transform: &Transform,
     pos: IVec3,
-    block: &Block,
-    block_set: &BlockSet,
-    collection: &Collection,
+    rotation: Quat,
+    armature: u32,
     pan: f32,
     tilt: f32,
     inverse: bool,
 ) -> [Transform; 3] {
-    let armature = block_set.get_armature(block.id);
-    let armature = &collection.armatures[armature as usize];
+    let armature = &state.collection.armatures[armature as usize];
 
     let trf_base = Transform::IDENTITY;
     let trf_pan = Transform::from_rotation_y(pan);
     let trf_tilt = Transform::from_rotation_z(tilt);
 
-    let base = Transform::new(pos.as_vec3(), block.orientation());
+    let base = Transform::new(pos.as_vec3(), rotation);
     let base = vehicle_transform.apply_to_transform(&base);
 
     armature

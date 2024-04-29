@@ -64,7 +64,7 @@ impl Body {
                 suspension: WheelSuspension {
                     max_length: 0.6,
                     force_per_distance: 5000.0,
-                    damp_per_velocity: 50.0,
+                    damp_per_velocity: 500.0,
                 },
             };
             let w = self.vehicle_body.add_wheel(w);

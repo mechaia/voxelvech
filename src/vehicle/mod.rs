@@ -1,9 +1,13 @@
 mod block;
+mod block_set;
 mod damage;
 mod physics;
 mod turret;
 
-use crate::{gfx::DrawCollector, physics::Physics};
+use crate::{
+    gfx::{Draw, DrawCollector},
+    physics::Physics,
+};
 use mechaia::{
     math::{IVec3, Vec3, Vec3Swizzles},
     model::Collection,
@@ -12,11 +16,14 @@ use mechaia::{
 };
 use std::{
     collections::HashMap,
-    ops::Index,
     time::{Duration, Instant},
 };
 
-pub use {block::Block, damage::DamageAccumulator};
+pub use {
+    block::Block,
+    block_set::{BlockSet, BlockSetEntry, BlockSetEntryData},
+    damage::DamageAccumulator,
+};
 
 pub struct Vehicle {
     physics: physics::Body,
@@ -31,6 +38,13 @@ struct Turret {
     next_fire: Instant,
 }
 
+pub struct Projectile {
+    pub start: Transform,
+    pub length: f32,
+    pub mesh_index: u32,
+    pub armature_index: u32,
+}
+
 #[derive(Default)]
 pub struct InputControls {
     pub forward: f32,
@@ -38,93 +52,6 @@ pub struct InputControls {
     pub tilt: f32,
     pub target: Vec3,
     pub fire: bool,
-}
-
-pub struct BlockSet {
-    blocks: Vec<BlockSetEntry>,
-    name_to_id: HashMap<Box<str>, u32>,
-}
-
-pub struct BlockSetEntry {
-    name: Box<str>,
-    mesh: u32,
-    armature: u32,
-    health: u32,
-}
-
-impl BlockSet {
-    pub fn from_collection(collection: &Collection) -> Self {
-        let mut blocks = Vec::new();
-        let mut name_to_id = HashMap::new();
-
-        // FIXME we need a better way to manage these damn assets
-        for root in collection.scenes.iter() {
-            for node in root.descendants() {
-                if let Some(name) = node
-                    .properties()
-                    .name
-                    .as_ref()
-                    .filter(|n| n.starts_with("block."))
-                {
-                    let mechaia::model::Node::Leaf { model, .. } = node else {
-                        panic!("todo: handle multi-mesh blocks (or not?)");
-                    };
-                    let model = &collection.models[*model];
-                    let name = Box::<str>::from(&name[6..]);
-                    let i = blocks.len().try_into().unwrap();
-                    blocks.push(BlockSetEntry {
-                        name: name.clone(),
-                        mesh: model.mesh_index.try_into().unwrap(),
-                        armature: if model.armature_index == usize::MAX {
-                            u32::MAX
-                        } else {
-                            model.armature_index.try_into().unwrap()
-                        },
-                        health: 100,
-                    });
-                    name_to_id.insert(name, i);
-                }
-            }
-        }
-
-        Self { blocks, name_to_id }
-    }
-
-    pub fn cube_id(&self) -> u32 {
-        self.get_id("cube").expect("no cube defined")
-    }
-
-    pub fn get_id(&self, name: &str) -> Option<u32> {
-        self.name_to_id.get(name).copied()
-    }
-
-    pub fn get_name(&self, id: u32) -> &str {
-        &*self.blocks[usize::try_from(id).unwrap()].name
-    }
-
-    pub fn get_mesh(&self, id: u32) -> u32 {
-        self.blocks[usize::try_from(id).unwrap()].mesh
-    }
-
-    pub fn get_armature(&self, id: u32) -> u32 {
-        self.blocks[usize::try_from(id).unwrap()].armature
-    }
-
-    pub fn len(&self) -> usize {
-        self.blocks.len()
-    }
-
-    pub fn len_u32(&self) -> u32 {
-        self.len().try_into().unwrap()
-    }
-}
-
-impl Index<u32> for BlockSet {
-    type Output = BlockSetEntry;
-
-    fn index(&self, id: u32) -> &Self::Output {
-        &self.blocks[usize::try_from(id).unwrap()]
-    }
 }
 
 impl Vehicle {
@@ -216,11 +143,10 @@ impl Vehicle {
 
     pub fn render(
         &self,
-        block_set: &BlockSet,
-        collection: &Collection,
+        state: &crate::State,
         physics: &Physics,
         interpolation: f32,
-        collector: &mut DrawCollector,
+        draw: &mut Draw<'_>,
     ) {
         let end_trf = self.physics.transform(physics);
         let trf = self
@@ -235,36 +161,49 @@ impl Vehicle {
             }
 
             let mut trfs = Vec::new();
-            let mut push =
-                |tr, rot| trfs.push(trf.apply_to_transform(&Transform::new(tr, rot)).into());
-            if blk.id != 5 {
-                push(pos.as_vec3(), blk.orientation());
-            }
-            // FIXME
-            if blk.id == 4 {
-                let w = *self.physics.pos_to_wheel.get(&pos).unwrap();
-                let (start_axle, start_tire) = self.physics.prev_wheel_transforms.get(&w).unwrap();
-                let (end_axle, end_tire) = self.physics.vehicle_body.wheel_local_transform(w);
-                let axle = start_axle.interpolate(&end_axle, interpolation);
-                let tire = start_tire.interpolate(&end_tire, interpolation);
-                push(axle.translation, axle.rotation);
-                push(tire.translation, tire.rotation);
-            } else if blk.id == 5 {
-                let turret = self.turrets.get(&pos).unwrap();
-                let t = turret::turret_model_to_world_transform(
-                    &trf,
-                    pos,
-                    blk,
-                    block_set,
-                    collection,
-                    turret.pan,
-                    turret.tilt,
-                    true,
-                );
-                t.map(|t| trfs.push(t.into()));
-            }
-            let mesh = block_set.get_mesh(blk.id);
-            collector.solid.push(mesh, 0, &trfs)
+            let mut push = |t| trfs.push(trf.apply_to_transform(&t).into());
+
+            let mesh = match &state.block_set[blk.id].data {
+                BlockSetEntryData::Regular { mesh } => {
+                    push(Transform::new(pos.as_vec3(), blk.orientation()));
+                    *mesh
+                }
+                BlockSetEntryData::Wheel { mesh, armature } => {
+                    let w = *self.physics.pos_to_wheel.get(&pos).unwrap();
+                    let (start_axle, start_tire) =
+                        self.physics.prev_wheel_transforms.get(&w).unwrap();
+                    let (end_axle, end_tire) = self.physics.vehicle_body.wheel_local_transform(w);
+                    let axle = start_axle.interpolate(&end_axle, interpolation);
+                    let tire = start_tire.interpolate(&end_tire, interpolation);
+                    push(Transform::new(pos.as_vec3(), blk.orientation()));
+                    push(axle);
+                    push(tire);
+                    *mesh
+                }
+                BlockSetEntryData::Weapon {
+                    mesh,
+                    armature,
+                    projectile_mesh,
+                    projectile_armature,
+                } => {
+                    let turret = self.turrets.get(&pos).unwrap();
+                    let t = turret::turret_model_to_world_transform(
+                        state,
+                        &trf,
+                        pos,
+                        blk.orientation(),
+                        *armature,
+                        turret.pan,
+                        turret.tilt,
+                        true,
+                    );
+                    t.map(|t| trfs.push(t.into()));
+                    *mesh
+                }
+            };
+            draw.collector
+                .solid
+                .push(state.block_set.mesh_set(), mesh, 0, &trfs)
         }
     }
 
@@ -278,12 +217,10 @@ impl Vehicle {
 
     pub fn set_input_controls(
         &mut self,
-        block_set: &BlockSet,
-        projectile_model: u32,
-        collection: &Collection,
+        state: &crate::State,
         physics: &Physics,
         controls: &InputControls,
-    ) -> Vec<(Transform, f32)> {
+    ) -> Vec<Projectile> {
         // movement
         let com = self.physics.center_of_mass(physics);
 
@@ -315,8 +252,10 @@ impl Vehicle {
             let trf = Transform::new(pos.as_vec3(), blk.orientation());
             let target = trf.apply_to_translation_inv(target);
 
-            let armature = block_set.get_armature(blk.id);
-            let armature = &collection.armatures[armature as usize];
+            let BlockSetEntryData::Weapon { armature, .. } = &state.block_set[blk.id].data else {
+                unreachable!()
+            };
+            let armature = &state.collection.armatures[*armature as usize];
             let trfs = armature.apply(&Transform::IDENTITY, &[Transform::IDENTITY; 3], false);
             let tilt_joint_offset = trfs[2].translation.xz();
 
@@ -326,9 +265,6 @@ impl Vehicle {
         // fire
         let mut projectiles = Vec::new();
         if controls.fire {
-            let model = &collection.models[projectile_model as usize];
-            let mesh = model.mesh_index;
-            let armature = &collection.armatures[model.armature_index];
             let t = Instant::now();
             for (&pos, turret) in self.turrets.iter_mut() {
                 if turret.next_fire > t {
@@ -336,12 +272,23 @@ impl Vehicle {
                 }
 
                 let blk = self.voxels.get(pos).unwrap();
+
+                let BlockSetEntryData::Weapon {
+                    mesh: _,
+                    armature,
+                    projectile_mesh,
+                    projectile_armature,
+                } = &state.block_set[blk.id].data
+                else {
+                    unreachable!()
+                };
+
                 let turret_trfs = turret::turret_model_to_world_transform(
+                    state,
                     &trf,
                     pos,
-                    blk,
-                    block_set,
-                    collection,
+                    blk.orientation(),
+                    *armature,
                     turret.pan,
                     turret.tilt,
                     false,
@@ -352,7 +299,12 @@ impl Vehicle {
                     .engine
                     .cast_ray(muzzle_trf.translation, dir * 1e3, None);
                 let dist = ray.map_or(1e3, |r| r.distance);
-                projectiles.push((muzzle_trf, dist));
+                projectiles.push(Projectile {
+                    start: muzzle_trf,
+                    length: dist,
+                    mesh_index: *projectile_mesh,
+                    armature_index: *projectile_armature,
+                });
 
                 turret.next_fire = t.checked_add(Duration::from_secs(1)).unwrap();
             }
@@ -413,8 +365,7 @@ impl Vehicle {
             out(b" ")?;
             out(k.z.to_string().as_bytes())?;
             out(b" ")?;
-            let name = block_set.get_name(b.id);
-            out(name.as_bytes())?;
+            out(block_set[b.id].name.as_bytes())?;
             out(b" ")?;
             out(b.orientation.to_string().as_bytes())?;
             out(b"\n")?;

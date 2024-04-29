@@ -174,8 +174,10 @@ impl DamageAccumulator {
         // so less likely to cause lagspikes
         // (it is also very simple)
         if body.core == u32::MAX {
-            // TODO spam
-            //crate::log::warn("no core, won't attempt disconnection");
+            // TODO rather spammy
+            if destroyed.len() > 0 {
+                crate::log::warn("no core, won't attempt disconnection");
+            }
             return;
         }
 
