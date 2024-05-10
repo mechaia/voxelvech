@@ -2,6 +2,7 @@ mod block;
 mod block_set;
 mod damage;
 mod physics;
+mod sound;
 mod turret;
 
 use crate::{
@@ -23,6 +24,7 @@ pub use {
     block::Block,
     block_set::{BlockSet, BlockSetEntry, BlockSetEntryData},
     damage::DamageAccumulator,
+    sound::VehicleSound,
 };
 
 pub struct Vehicle {
@@ -68,6 +70,7 @@ impl Vehicle {
     pub fn force_add(
         &mut self,
         physics: &mut Physics,
+        sound: &mut VehicleSound,
         block_set: &BlockSet,
         pos: IVec3,
         block: Block,
@@ -77,8 +80,8 @@ impl Vehicle {
             return;
         }
 
-        self.physics.add(physics, pos, &block);
-        if block.id == 5 {
+        self.physics.add(physics, sound, block_set, pos, &block);
+        if let BlockSetEntryData::Weapon { .. } = &block_set[block.id].data {
             self.turrets.insert(
                 pos,
                 Turret {
@@ -93,8 +96,8 @@ impl Vehicle {
     }
 
     /// Remove a block without any sanity checks.
-    pub fn force_remove(&mut self, physics: &mut Physics, pos: IVec3) {
-        self.physics.remove(physics, pos);
+    pub fn force_remove(&mut self, physics: &mut Physics, sound: &mut VehicleSound, pos: IVec3) {
+        self.physics.remove(physics, sound, pos);
         self.voxels.remove(pos);
         self.turrets.remove(&pos);
         self.damage.remove(pos);
@@ -141,6 +144,10 @@ impl Vehicle {
         self.physics.step(physics);
     }
 
+    pub fn apply_sounds(&mut self, sound: &mut VehicleSound) {
+        self.physics.apply_sounds(sound)
+    }
+
     pub fn render(
         &self,
         state: &crate::State,
@@ -169,10 +176,10 @@ impl Vehicle {
                     *mesh
                 }
                 BlockSetEntryData::Wheel { mesh, armature } => {
-                    let w = *self.physics.pos_to_wheel.get(&pos).unwrap();
-                    let (start_axle, start_tire) =
-                        self.physics.prev_wheel_transforms.get(&w).unwrap();
-                    let (end_axle, end_tire) = self.physics.vehicle_body.wheel_local_transform(w);
+                    let w = self.physics.pos_to_wheel.get(&pos).unwrap();
+                    let (start_axle, start_tire) = (w.prev_axle, w.prev_tire);
+                    let (end_axle, end_tire) =
+                        self.physics.vehicle_body.wheel_local_transform(w.handle);
                     let axle = start_axle.interpolate(&end_axle, interpolation);
                     let tire = start_tire.interpolate(&end_tire, interpolation);
                     push(Transform::new(pos.as_vec3(), blk.orientation()));
@@ -230,17 +237,17 @@ impl Vehicle {
         let brake = f32::from(forward == 0.0);
         let pan = controls.pan.clamp(-1.0, 1.0);
 
-        for (&pos, &w) in self.physics.pos_to_wheel.iter() {
+        for (&pos, w) in self.physics.pos_to_wheel.iter() {
             //let forward = if pos.x < 0 { -forward } else { forward };
             let forward = if pos.y < 0 { -forward } else { forward };
             let pan = if (pos.x as f32) < com.x { -pan } else { pan };
             self.physics
                 .vehicle_body
-                .set_wheel_angle(w, pan * wheel_max_angle);
+                .set_wheel_angle(w.handle, pan * wheel_max_angle);
             self.physics
                 .vehicle_body
-                .set_wheel_torque(w, forward * wheel_max_torque);
-            self.physics.vehicle_body.set_wheel_brake(w, brake);
+                .set_wheel_torque(w.handle, forward * wheel_max_torque);
+            self.physics.vehicle_body.set_wheel_brake(w.handle, brake);
         }
 
         // aim target
@@ -320,10 +327,15 @@ impl Vehicle {
 
 /// Damage stuff
 impl Vehicle {
-    pub fn apply_damage(&mut self, physics: &mut Physics, acc: DamageAccumulator) {
+    pub fn apply_damage(
+        &mut self,
+        physics: &mut Physics,
+        sound: &mut VehicleSound,
+        acc: DamageAccumulator,
+    ) {
         let destroyed = acc.apply(&mut self.damage);
         for pos in destroyed {
-            self.physics.remove(physics, pos);
+            self.physics.remove(physics, sound, pos);
         }
     }
 
@@ -373,7 +385,13 @@ impl Vehicle {
         Ok(())
     }
 
-    pub fn load_v0_text(&mut self, block_set: &BlockSet, physics: &mut Physics, text: &str) {
+    pub fn load_v0_text(
+        &mut self,
+        sound: &mut VehicleSound,
+        block_set: &BlockSet,
+        physics: &mut Physics,
+        text: &str,
+    ) {
         self.voxels.clear();
         self.physics.clear(physics);
         self.turrets.clear();
@@ -401,18 +419,19 @@ impl Vehicle {
                 }),
                 orientation,
             };
-            self.force_add(physics, block_set, IVec3::new(x, y, z), blk);
+            self.force_add(physics, sound, block_set, IVec3::new(x, y, z), blk);
         }
     }
 
     pub fn new_v0_text(
         block_set: &BlockSet,
         physics: &mut Physics,
+        sound: &mut VehicleSound,
         text: &str,
         user_data: u32,
     ) -> Self {
         let mut slf = Self::new(physics, user_data);
-        slf.load_v0_text(block_set, physics, text);
+        slf.load_v0_text(sound, block_set, physics, text);
         slf
     }
 }

@@ -6,18 +6,26 @@ use crate::{
     log,
     physics::Physics,
     scenario::World,
-    vehicle::{self, Block, BlockSet, DamageAccumulator, Vehicle},
+    vehicle::{self, Block, BlockSet, DamageAccumulator, Vehicle, VehicleSound},
     Scenario,
 };
 use mechaia::{
     input::KeyOrName,
     math::{IVec3, Quat, Vec3},
     render::resource::camera::CameraView,
-    util::Transform,
+    util::{
+        math::fixed::{U0d32, U32d32},
+        rand::{self, Rng},
+        sync::half,
+        Transform,
+    },
 };
 use std::{
     collections::VecDeque,
     io::{self, Write},
+    num::Wrapping,
+    ops::RangeInclusive,
+    sync::Mutex,
     time::{Duration, Instant, SystemTime},
 };
 
@@ -37,6 +45,13 @@ pub struct Editor {
     ui: Ui,
     /// File of player vehicle to default to.
     player_vehicle_file: String,
+    sounds: half::Half<half::Left, Mutex<Sounds>>,
+}
+
+struct Sounds {
+    player_vehicle: VehicleSound,
+    enemy_vehicles: Vec<VehicleSound>,
+    paused: bool,
 }
 
 struct Autosaver {
@@ -79,6 +94,7 @@ impl Autosaver {
                 next_save_age = time;
             }
         }
+
         Self {
             next_save,
             max_saves,
@@ -148,19 +164,29 @@ impl Editor {
     const USER_DATA_PLAYER: u32 = 1;
     const USER_DATA_ENEMY_START: u32 = 2;
 
-    pub fn new(state: &mut crate::State, gfx: &mut Gfx) -> Self {
+    pub fn new(state: &mut crate::State, gfx: &mut Gfx) -> (Self, crate::SoundsHandler) {
         let mut physics = Physics::new();
 
         let world = World::load_from_asset("data/scenario_editor.glb", &mut physics, gfx)
             .expect("failed to load editor scene");
 
-        let player_vehicle =
-            default_vehicle(&mut physics, &state.block_set, Self::USER_DATA_PLAYER);
+        let mut sounds = Sounds {
+            player_vehicle: Default::default(),
+            enemy_vehicles: Default::default(),
+            paused: false,
+        };
+
+        let player_vehicle = default_vehicle(
+            &mut physics,
+            &mut sounds.player_vehicle,
+            &state.block_set,
+            Self::USER_DATA_PLAYER,
+        );
         let player = player::Player::new(&state.block_set);
 
-        crate::log::debug("Editor initialized");
+        let (sounds, sounds_handler) = new_sounds_handler(sounds);
 
-        Self {
+        let slf = Self {
             physics,
             world,
             player_vehicle,
@@ -172,12 +198,22 @@ impl Editor {
             block_ghost: None,
             ui: Ui::Nothing,
             player_vehicle_file: "".to_string(),
-        }
+            sounds,
+        };
+
+        crate::log::debug("Editor initialized");
+
+        (slf, sounds_handler)
+    }
+
+    fn set_ui(&mut self, ui: Ui) {
+        self.ui = ui;
+        self.sounds.lock().unwrap().paused = !matches!(&self.ui, Ui::Nothing);
     }
 
     fn handle_ui(&mut self, state: &mut crate::State) {
         if state.input_hold_or_edge_over("ui.menu") {
-            self.ui = if matches!(&self.ui, Ui::Nothing) {
+            self.set_ui(if matches!(&self.ui, Ui::Nothing) {
                 Ui::Menu(ItemPicker {
                     items: [
                         "continue",
@@ -195,7 +231,7 @@ impl Editor {
                 })
             } else {
                 Ui::Nothing
-            };
+            });
         }
 
         match &mut self.ui {
@@ -203,34 +239,34 @@ impl Editor {
             Ui::Menu(picker) => {
                 if let Some(item) = picker.handle_input(state) {
                     match item {
-                        "continue" => self.ui = Ui::Nothing,
+                        "continue" => self.set_ui(Ui::Nothing),
                         "save" => {
-                            self.ui = Ui::Save(ItemPicker {
+                            self.set_ui(Ui::Save(ItemPicker {
                                 items: self.autosaver.list(),
                                 selected: 0,
                                 filter: self.player_vehicle_file.clone(),
-                            });
+                            }));
                         }
                         "load" => {
-                            self.ui = Ui::Load(ItemPicker {
+                            self.set_ui(Ui::Load(ItemPicker {
                                 items: self.autosaver.list(),
                                 selected: 0,
                                 filter: "".to_string(),
-                            });
+                            }));
                         }
                         "spawn enemy" => {
-                            self.ui = Ui::Spawn(ItemPicker {
+                            self.set_ui(Ui::Spawn(ItemPicker {
                                 items: self.autosaver.list(),
                                 selected: 0,
                                 filter: "".to_string(),
-                            });
+                            }));
                         }
                         "remove enemies" => {
                             for v in self.enemy_vehicles.drain(..) {
                                 v.destroy(&mut self.physics);
                             }
                             log::success("enemies removed");
-                            self.ui = Ui::Nothing;
+                            self.set_ui(Ui::Nothing);
                         }
                         "exit" => {
                             if self.autosaver.deadline.is_some() {
@@ -243,7 +279,7 @@ impl Editor {
                         "reset vehicle" => {
                             reset_vehicle_transform(&mut self.physics, &mut self.player_vehicle);
                             self.player_vehicle.reset_damage(&state.block_set);
-                            self.ui = Ui::Nothing;
+                            self.set_ui(Ui::Nothing);
                         }
                         s => todo!("{s}"),
                     }
@@ -254,13 +290,14 @@ impl Editor {
                     match std::fs::read_to_string(item) {
                         Ok(s) => {
                             self.player_vehicle.load_v0_text(
+                                &mut self.sounds.lock().unwrap().player_vehicle,
                                 &state.block_set,
                                 &mut self.physics,
                                 &s,
                             );
                             reset_vehicle_transform(&mut self.physics, &mut self.player_vehicle);
                             log::success("loaded vehicle");
-                            self.ui = Ui::Nothing;
+                            self.set_ui(Ui::Nothing);
                             self.autosaver.deadline = None;
                         }
                         Err(e) => {
@@ -309,9 +346,11 @@ impl Editor {
                     match std::fs::read_to_string(item) {
                         Ok(s) => {
                             let udata = (2 + self.enemy_vehicles.len()).try_into().unwrap();
+                            let mut v_snd = VehicleSound::default();
                             let mut v = Vehicle::new_v0_text(
                                 &state.block_set,
                                 &mut self.physics,
+                                &mut v_snd,
                                 &s,
                                 udata,
                             );
@@ -322,7 +361,8 @@ impl Editor {
                             );
                             log::success("spawned enemy vehicle");
                             self.enemy_vehicles.push(v);
-                            self.ui = Ui::Nothing;
+                            self.sounds.lock().unwrap().enemy_vehicles.push(v_snd);
+                            self.set_ui(Ui::Nothing);
                         }
                         Err(e) => {
                             log::error(format!("error reading '{item}': {e}"));
@@ -382,10 +422,21 @@ impl Editor {
                 }
             }
 
-            self.player_vehicle
-                .apply_damage(&mut self.physics, player_dmg);
-            for (v, dmg) in self.enemy_vehicles.iter_mut().zip(enemy_dmg) {
-                v.apply_damage(&mut self.physics, dmg);
+            {
+                let mut snd = self.sounds.lock().unwrap();
+                self.player_vehicle.apply_damage(
+                    &mut self.physics,
+                    &mut snd.player_vehicle,
+                    player_dmg,
+                );
+                for ((v, snd), dmg) in self
+                    .enemy_vehicles
+                    .iter_mut()
+                    .zip(snd.enemy_vehicles.iter_mut())
+                    .zip(enemy_dmg)
+                {
+                    v.apply_damage(&mut self.physics, snd, dmg);
+                }
             }
 
             // visual stuff
@@ -405,6 +456,18 @@ impl Editor {
                 v.step(&mut self.physics);
             }
 
+            {
+                let mut snd = self.sounds.lock().unwrap();
+                self.player_vehicle.apply_sounds(&mut snd.player_vehicle);
+                for (v, snd) in self
+                    .enemy_vehicles
+                    .iter_mut()
+                    .zip(snd.enemy_vehicles.iter_mut())
+                {
+                    v.step(&mut self.physics);
+                }
+            }
+
             self.physics.engine.step();
             self.physics_step_start = next_t;
         }
@@ -416,9 +479,15 @@ impl Editor {
 impl Scenario for Editor {
     fn step(&mut self, state: &mut crate::State) {
         self.block_ghost = if matches!(&self.ui, Ui::Nothing) {
-            let res =
-                self.player
-                    .handle_inputs(&state, &mut self.physics, &mut self.player_vehicle);
+            let res = {
+                let mut snd = self.sounds.lock().unwrap();
+                self.player.handle_inputs(
+                    &state,
+                    &mut self.physics,
+                    &mut self.player_vehicle,
+                    &mut snd,
+                )
+            };
             if res.vehicle_dirty {
                 self.autosaver.init_deadline();
             }
@@ -436,6 +505,14 @@ impl Scenario for Editor {
         }
 
         self.step_physics(state);
+
+        {
+            let mut snd = self.sounds.lock().unwrap();
+            let v_trf = self.player_vehicle.transform(&mut self.physics);
+            let p_trf = self.player.transform();
+            snd.player_vehicle
+                .update(&p_trf.apply_to_transform_inv(&v_trf));
+        }
     }
 
     fn draw(&mut self, state: &mut crate::State, draw: &mut Draw<'_>) {
@@ -518,20 +595,561 @@ impl Scenario for Editor {
     }
 }
 
-fn default_vehicle(physics: &mut Physics, block_set: &BlockSet, user_data: u32) -> Vehicle {
+fn default_vehicle(
+    physics: &mut Physics,
+    sound: &mut VehicleSound,
+    block_set: &BlockSet,
+    user_data: u32,
+) -> Vehicle {
     let mut vehicle = Vehicle::new(physics, user_data);
 
     vehicle.force_add(
         physics,
+        sound,
         block_set,
         IVec3::ZERO,
         Block::new(block_set.cube_id(), 0, 0),
     );
     reset_vehicle_transform(physics, &mut vehicle);
+    sound.update(&vehicle.transform(physics));
 
     vehicle
 }
 
 fn reset_vehicle_transform(physics: &mut Physics, vehicle: &mut Vehicle) {
     vehicle.set_transform(physics, &Transform::new(Vec3::Z * 0.5, Quat::IDENTITY));
+}
+
+/*
+struct Tone {
+    start: U0d32,
+    frequency: u32,
+    amplitude: f32,
+}
+
+fn gen_cracking_tones<R: Rng>(rng: &mut R, tones: &mut Vec<Tone>, start: U0d32, cur_freq: f32) {
+    if tones.len() >= 128 {
+        return;
+    }
+    for _ in 0..4 {
+        //let new_freq = cur_freq * rng.gen_range(2.0..=10.0);
+        //let new_freq = cur_freq * rng.gen_range(1.5..=10.0);
+        //let new_freq = cur_freq * rng.gen_range(1.5..=3.0);
+        let new_freq = cur_freq * rng.gen_range(1.5..=4.0);
+        //let new_freq = cur_freq * rng.gen_range(1.5..=10.0);
+        //let new_freq = cur_freq * rng.gen_range(1.5..=5.0);
+        if new_freq >= 2e4 {
+            continue;
+        }
+        let start = rng.gen_range(start..=U0d32::MAX / 10);
+        gen_cracking_tones(rng, tones, start, new_freq);
+    }
+    tones.push(Tone {
+        start,
+        frequency: cur_freq as _,
+        //amplitude: 1.0 / cur_freq,
+        amplitude: 1.0,
+    });
+}
+
+fn new_sounds_handler(
+    sounds: Sounds,
+) -> (half::Half<half::Left, Mutex<Sounds>>, crate::SoundsHandler) {
+    let (ret_sounds, sounds) = half::half(Mutex::new(sounds));
+
+    let mut t0 = U0d32::ZERO;
+    let mut t1 = U0d32::ZERO;
+    let mut t2 = U0d32::ZERO;
+    let mut t = U0d32::ZERO;
+    let mut src = mechaia::sound::mix::wave::RandomStep2::new(rand::rngs::OsRng::default(), 1e3);
+    let mut src = mechaia::sound::mix::wave::RandomStep::new(rand::rngs::OsRng::default(), 1e3);
+
+    let new_params = move || {
+        let mut rng = rand::thread_rng();
+        let mut v = Vec::new();
+        let f = rng.gen_range(200.0..=2000.0);
+        let f = 200.0;
+        gen_cracking_tones(&mut rng, &mut v, U0d32::ZERO, f);
+        let s = v.iter().map(|x| x.amplitude).sum::<f32>();
+        v.iter_mut().for_each(|x| x.amplitude /= s);
+        let mut v = v.into_iter().map(|t| (Wrapping(U0d32::ZERO), t)).collect::<Vec<_>>();
+        dbg!(v.len());
+        v
+    };
+    let mut params = new_params();
+    let mut trigger = false;
+
+    let sounds_handler = Box::new(
+        move |buf: &mut [f32], channels: u16, interpolate: RangeInclusive<f32>, dt: U0d32| {
+            for w in buf.iter_mut() {
+                if t < U0d32::from_f32(0.99) {
+                    *w = params
+                        .iter_mut()
+                        .filter(|(_, tone)| U32d32::from(tone.start) <= U32d32::from(t) * 3)
+                        .map(|(t, tone)| {
+                            *t += dt.wrapping_mul_u32(tone.frequency);
+                            let v = mechaia::sound::mix::wave::sine(t.0) * tone.amplitude;
+                            let f = 5.0;
+                            let f = 0.05;
+                            tone.amplitude *= (-(tone.frequency as f32) * dt.to_f32() * f).exp();
+                            v
+                        })
+                        .sum();
+                    // *w = src.next_sample(dt.into());
+                    // *w = mechaia::sound::mix::wave::triangle(t);
+                    /*
+                    *w = 0.0;
+                    *w += mechaia::sound::mix::wave::sine(t0) * 0.4;
+                    *w += mechaia::sound::mix::wave::sine(t1) * 0.3;
+                    *w += mechaia::sound::mix::wave::sine(t2) * 0.3;
+                    *w *= (-t.to_f32() * 20.0).exp();
+                    t0 = t0.wrapping_add(dt.wrapping_mul_u32(200));
+                    t1 = t1.wrapping_add(dt.wrapping_mul_u32(1000));
+                    t2 = t2.wrapping_add(dt.wrapping_mul_u32(10000));
+                    */
+                    trigger = true;
+                } else {
+                    if trigger {
+                        params = new_params();
+                    }
+                    trigger = false;
+                }
+                t = t.wrapping_add(dt);
+            }
+            return;
+
+            {
+                let mut snd = sounds.lock().unwrap();
+                if snd.paused {
+                    dbg!();
+                    return;
+                }
+                snd.player_vehicle.next_samples(interpolate, dt, buf);
+            }
+            let mut i = buf.len() / usize::from(channels);
+            while i > 0 {
+                i -= 1;
+                let k = i * usize::from(channels);
+                let v = buf[i];
+                buf[k..k + usize::from(channels)].fill(v);
+            }
+        },
+    );
+
+    (ret_sounds, sounds_handler)
+}
+*/
+
+/*
+struct Tone {
+    t: Wrapping<U0d32>,
+    frequency: u32,
+    amplitude: f32,
+    buildup: f32,
+}
+
+fn gen_tone<R: Rng>(rng: &mut R) -> Tone {
+    Tone {
+        t: Default::default(),
+        //frequency: rng.gen_range(800..=12000),
+        frequency: rng.gen_range(200..=12000),
+        amplitude: 1.0,
+        buildup: 0.0,
+    }
+}
+
+fn gen_tone_freq(f: f32) -> Tone {
+    Tone {
+        t: Default::default(),
+        frequency: f as u32,
+        //amplitude: 1.0 / f,
+        amplitude: 1e3 / f,
+        buildup: 0.0,
+    }
+}
+
+fn sample_tone(tone: &mut Tone, dt: U0d32) -> Option<f32> {
+    if tone.amplitude < 1e-3 {
+        return None
+    }
+    tone.buildup += dt.to_f32() * 20.0;
+    tone.buildup = tone.buildup.min(1.0);
+    tone.t += dt.wrapping_mul_u32(tone.frequency);
+    let v = mechaia::sound::mix::wave::sine(tone.t.0);
+    //let v = mechaia::sound::mix::wave::square(tone.t.0);
+    //tone.amplitude *= (-dt.to_f32() * tone.frequency as f32 / 1000.0).exp2();
+    //tone.amplitude *= (-dt.to_f32() * tone.frequency as f32 / 100.0).exp2();
+    //tone.amplitude *= (-dt.to_f32() * tone.frequency as f32 / 10.0).exp2();
+    tone.amplitude *= (-dt.to_f32() * tone.frequency as f32 / 1.0).exp2();
+    //tone.amplitude *= (-dt.to_f32() * tone.frequency as f32 / 0.2).exp2();
+    //tone.amplitude *= (-dt.to_f32() * tone.frequency as f32 / 0.1).exp2();
+    //tone.amplitude *= (-dt.to_f32() * tone.frequency as f32 / 0.05).exp2();
+    Some(v * tone.amplitude * tone.buildup)
+}
+
+fn new_sounds_handler(
+    sounds: Sounds,
+) -> (half::Half<half::Left, Mutex<Sounds>>, crate::SoundsHandler) {
+    let (ret_sounds, sounds) = half::half(Mutex::new(sounds));
+
+    let mut tones = Vec::new();
+    let mut t = U32d32::ZERO;
+    let mut out = std::io::BufWriter::new(std::fs::OpenOptions::new().write(true).truncate(true).create(true).open("/tmp/test.f32.raw").unwrap());
+
+    let mut queue = VecDeque::new();
+
+    let sounds_handler = Box::new(
+        move |buf: &mut [f32], channels: u16, interpolate: RangeInclusive<f32>, dt: U0d32| {
+            //dbg!(t);
+            /*
+            if t >= U32d32::ONE * 10 {
+                std::process::exit(0);
+            }
+            */
+            let mut rng = rand::thread_rng();
+            for w in buf.iter_mut() {
+                //if rng.gen_bool(0.001) {
+                //    tones.push(gen_tone(&mut rng));
+                //}
+                //let f = rng.gen_range(1e2..=1e4);
+                //let f = rng.gen_range(2e3..=3e3);
+                let f = rng.gen_range(4e2..=8e2);
+                //let f = rng.gen_range(2e2..=3e2);
+                //let f = rng.gen_range(2e3..=3e3);
+                if rng.gen_bool((f / 1.5e5).into()) {
+                //if rng.gen_bool((f / 1.5e4).into()) {
+                //if rng.gen_bool((f / 1.5e6).into()) {
+                //if rng.gen_bool((f / 1.5e6 * t.to_f32()).into()) {
+                    tones.push(gen_tone_freq(f));
+                }
+                let mut vv = 0.0;
+                for i in (0..tones.len()).rev() {
+                    if let Some(v) = sample_tone(&mut tones[i], dt) {
+                        vv += v;
+                    } else {
+                        tones.swap_remove(i);
+                    }
+                }
+                vv *= 3.0;
+                //vv /= 3.0;
+                if queue.len() > 10 {
+                    queue.pop_back();
+                }
+                queue.push_front(vv);
+                *w = queue.iter().sum::<f32>() / queue.len() as f32;
+                std::io::Write::write_all(&mut out, &w.to_le_bytes()).unwrap();
+            }
+            t += U32d32::from(dt) * buf.len() as u32;
+        },
+    );
+
+    (ret_sounds, sounds_handler)
+}
+*/
+
+/*
+struct Tone {
+    t: Wrapping<U0d32>,
+    frequency: u32,
+    amplitude: f32,
+}
+
+fn gen_tone<R: Rng>(rng: &mut R) -> Tone {
+    Tone {
+        t: Default::default(),
+        //frequency: rng.gen_range(800..=12000),
+        frequency: rng.gen_range(200..=12000),
+        amplitude: 1.0,
+    }
+}
+
+fn gen_tone_freq(f: f32) -> Tone {
+    Tone {
+        t: Default::default(),
+        frequency: f as u32,
+        amplitude: 1e3 / f,
+    }
+}
+
+fn sample_tone(tone: &mut Tone, dt: U0d32) -> Option<f32> {
+    if tone.amplitude < 1e-2 {
+        return None
+    }
+    tone.t += dt.wrapping_mul_u32(tone.frequency);
+    let v = mechaia::sound::mix::wave::sine(tone.t.0);
+    //let v = mechaia::sound::mix::wave::square(tone.t.0);
+    //tone.amplitude *= (-dt.to_f32() * tone.frequency as f32 / 1000.0).exp2();
+    //tone.amplitude *= (-dt.to_f32() * tone.frequency as f32 / 100.0).exp2();
+    //tone.amplitude *= (-dt.to_f32() * tone.frequency as f32 / 10.0).exp2();
+    //tone.amplitude *= (-dt.to_f32() * tone.frequency as f32 / 1.0).exp2();
+    tone.amplitude *= (-dt.to_f32() * tone.frequency as f32 / 0.2).exp2();
+    //tone.amplitude *= (-dt.to_f32() * tone.frequency as f32 / 0.1).exp2();
+    //tone.amplitude *= (-dt.to_f32() * tone.frequency as f32 / 0.05).exp2();
+    Some(v * tone.amplitude)
+}
+
+fn new_sounds_handler(
+    sounds: Sounds,
+) -> (half::Half<half::Left, Mutex<Sounds>>, crate::SoundsHandler) {
+    let (ret_sounds, sounds) = half::half(Mutex::new(sounds));
+
+    let mut tones = Vec::new();
+    let mut t = U32d32::ZERO;
+    let mut trigger = false;
+    let mut out = std::io::BufWriter::new(std::fs::OpenOptions::new().write(true).truncate(true).create(true).open("/tmp/test.f32.raw").unwrap());
+
+    let sounds_handler = Box::new(
+        move |buf: &mut [f32], channels: u16, interpolate: RangeInclusive<f32>, dt: U0d32| {
+            /*
+            if t >= U32d32::ONE * 5 {
+                std::process::exit(0);
+            }
+            */
+            let mut rng = rand::thread_rng();
+            for w in buf.iter_mut() {
+                //if rng.gen_bool(0.001) {
+                //    tones.push(gen_tone(&mut rng));
+                //}
+                if tones.is_empty() && !trigger && t.frac().to_f32() < 0.1 {
+                    for i in 0..4 {
+                        tones.push(gen_tone_freq(rng.gen_range(200.0..=500.0)));
+                    }
+                    //trigger = true
+                }
+                for i in (0..tones.len()).rev() {
+                    if let Some(v) = sample_tone(&mut tones[i], dt) {
+                        *w += v;
+                    } else {
+                        tones.swap_remove(i);
+                    }
+                }
+                if t.frac().to_f32() > 0.9 {
+                    trigger = false
+                }
+                *w /= 10.0;
+                *w *= (-t.frac().to_f32() * 20.0).exp();
+                std::io::Write::write_all(&mut out, &w.to_le_bytes()).unwrap();
+            }
+            t += U32d32::from(dt) * buf.len() as u32;
+        },
+    );
+
+    (ret_sounds, sounds_handler)
+}
+*/
+
+/*
+struct Tone {
+    t: Wrapping<U0d32>,
+    frequency: u32,
+    amplitude: f32,
+    buildup: f32,
+}
+
+fn gen_tone<R: Rng>(rng: &mut R) -> Tone {
+    Tone {
+        t: Default::default(),
+        //frequency: rng.gen_range(800..=12000),
+        frequency: rng.gen_range(200..=12000),
+        amplitude: 1.0,
+        buildup: 0.0,
+    }
+}
+
+fn gen_tone_freq(f: f32) -> Tone {
+    Tone {
+        t: Default::default(),
+        frequency: f as u32,
+        //amplitude: 1.0 / f,
+        amplitude: 1e3 / f,
+        buildup: 0.0,
+    }
+}
+
+fn sample_tone(tone: &mut Tone, dt: U0d32) -> Option<f32> {
+    if tone.amplitude < 1e-3 {
+        return None
+    }
+    tone.buildup += dt.to_f32() * 20.0;
+    tone.buildup = tone.buildup.min(1.0);
+    tone.t += dt.wrapping_mul_u32(tone.frequency);
+    let v = mechaia::sound::mix::wave::sine(tone.t.0);
+    //let v = mechaia::sound::mix::wave::square(tone.t.0);
+    //tone.amplitude *= (-dt.to_f32() * tone.frequency as f32 / 1000.0).exp2();
+    //tone.amplitude *= (-dt.to_f32() * tone.frequency as f32 / 100.0).exp2();
+    //tone.amplitude *= (-dt.to_f32() * tone.frequency as f32 / 10.0).exp2();
+    tone.amplitude *= (-dt.to_f32() * tone.frequency as f32 / 1.0).exp2();
+    //tone.amplitude *= (-dt.to_f32() * tone.frequency as f32 / 0.2).exp2();
+    //tone.amplitude *= (-dt.to_f32() * tone.frequency as f32 / 0.1).exp2();
+    //tone.amplitude *= (-dt.to_f32() * tone.frequency as f32 / 0.05).exp2();
+    Some(v * tone.amplitude * tone.buildup)
+}
+
+fn new_sounds_handler(
+    sounds: Sounds,
+) -> (half::Half<half::Left, Mutex<Sounds>>, crate::SoundsHandler) {
+    let (ret_sounds, sounds) = half::half(Mutex::new(sounds));
+
+    let mut tones = Vec::new();
+    let mut t = U32d32::ZERO;
+    let mut out = std::io::BufWriter::new(std::fs::OpenOptions::new().write(true).truncate(true).create(true).open("/tmp/test.f32.raw").unwrap());
+
+    let mut queue = VecDeque::new();
+
+    let sounds_handler = Box::new(
+        move |buf: &mut [f32], channels: u16, interpolate: RangeInclusive<f32>, dt: U0d32| {
+            //dbg!(t);
+            /*
+            if t >= U32d32::ONE * 10 {
+                std::process::exit(0);
+            }
+            */
+            let mut rng = rand::thread_rng();
+            for w in buf.iter_mut() {
+                //if rng.gen_bool(0.001) {
+                //    tones.push(gen_tone(&mut rng));
+                //}
+                //let f = rng.gen_range(1e2..=1e4);
+                //let f = rng.gen_range(2e3..=3e3);
+                let f = rng.gen_range(4e2..=8e2);
+                //let f = rng.gen_range(2e2..=3e2);
+                //let f = rng.gen_range(2e3..=3e3);
+                if rng.gen_bool((f / 1.5e5).into()) {
+                //if rng.gen_bool((f / 1.5e4).into()) {
+                //if rng.gen_bool((f / 1.5e6).into()) {
+                //if rng.gen_bool((f / 1.5e6 * t.to_f32()).into()) {
+                    tones.push(gen_tone_freq(f));
+                }
+                let mut vv = 0.0;
+                for i in (0..tones.len()).rev() {
+                    if let Some(v) = sample_tone(&mut tones[i], dt) {
+                        vv += v;
+                    } else {
+                        tones.swap_remove(i);
+                    }
+                }
+                vv *= 3.0;
+                //vv /= 3.0;
+                if queue.len() > 10 {
+                    queue.pop_back();
+                }
+                queue.push_front(vv);
+                *w = queue.iter().sum::<f32>() / queue.len() as f32;
+                std::io::Write::write_all(&mut out, &w.to_le_bytes()).unwrap();
+            }
+            t += U32d32::from(dt) * buf.len() as u32;
+        },
+    );
+
+    (ret_sounds, sounds_handler)
+}
+*/
+
+struct Tone {
+    t: Wrapping<U0d32>,
+    attack: U0d32,
+    hold: U0d32,
+    frequency: u32,
+    amplitude: f32,
+}
+
+fn gen_tone_freq(t: U0d32, hold: U0d32, f: f32, amplitude: f32) -> Tone {
+    Tone {
+        t: Wrapping(t),
+        attack: Default::default(),
+        hold,
+        frequency: f as u32,
+        amplitude,
+        //amplitude: 1e3 / f,
+    }
+}
+
+fn sample_tone(tone: &mut Tone, dt: U0d32) -> Option<f32> {
+    if tone.amplitude < 1e-2 {
+        return None
+    }
+    tone.t += dt.wrapping_mul_u32(tone.frequency * 3);
+    let v = mechaia::sound::mix::wave::sine(tone.t.0);
+    //let v = mechaia::sound::mix::wave::square(tone.t.0);
+    //tone.amplitude *= (-dt.to_f32() * tone.frequency as f32 / 1000.0).exp2();
+    //tone.amplitude *= (-dt.to_f32() * tone.frequency as f32 / 100.0).exp2();
+    //tone.amplitude *= (-dt.to_f32() * tone.frequency as f32 / 10.0).exp2();
+    //tone.amplitude *= (-dt.to_f32() * tone.frequency as f32 / 2.0).exp2();
+    //tone.amplitude *= (-dt.to_f32() * tone.frequency as f32 / 1.0).exp2();
+    /*
+    tone.attack = tone.attack.saturating_add(dt);
+    if tone.attack == U0d32::MAX {
+        tone.amplitude *= (-dt.to_f32() * 1000.0).exp2();
+    }
+    */
+    tone.hold = tone.hold.saturating_sub(dt);
+    if tone.hold == U0d32::ZERO {
+        tone.amplitude *= (-dt.to_f32() * 4e2).exp2();
+    }
+    //tone.amplitude *= (-dt.to_f32() * tone.frequency as f32 / 0.2).exp2();
+    //tone.amplitude *= (-dt.to_f32() * tone.frequency as f32 / 0.1).exp2();
+    //tone.amplitude *= (-dt.to_f32() * tone.frequency as f32 / 0.05).exp2();
+    Some(v * tone.amplitude)
+}
+
+fn new_sounds_handler(
+    sounds: Sounds,
+) -> (half::Half<half::Left, Mutex<Sounds>>, crate::SoundsHandler) {
+    let (ret_sounds, sounds) = half::half(Mutex::new(sounds));
+
+    let mut tones = Vec::new();
+    let mut t = U32d32::ZERO;
+    let mut trigger = false;
+    let mut out = std::io::BufWriter::new(std::fs::OpenOptions::new().write(true).truncate(true).create(true).open("/tmp/test.f32.raw").unwrap());
+
+    let sounds_handler = Box::new(
+        move |buf: &mut [f32], channels: u16, interpolate: RangeInclusive<f32>, dt: U0d32| {
+            /*
+            if t >= U32d32::ONE * 5 {
+                std::process::exit(0);
+            }
+            */
+            let mut rng = rand::thread_rng();
+            for w in buf.iter_mut() {
+                //if rng.gen_bool(0.001) {
+                //    tones.push(gen_tone(&mut rng));
+                //}
+                if tones.is_empty() && !trigger && t.frac().to_f32() < 0.1 {
+                    /*¨
+                    tones.push(gen_tone_freq(Default::default(), U0d32::FRAC_1_4 / 64, 436.363636363));
+                    tones.push(gen_tone_freq(Default::default(), U0d32::FRAC_1_4 / 64, 1777.77777777));
+                    tones.push(gen_tone_freq(Default::default(), U0d32::FRAC_1_4 / 64, 4363.63636363));
+                    */
+                    tones.push(gen_tone_freq(Default::default(), U0d32::FRAC_1_4 / 32, rng.gen_range(4e2..=4.5e2) * 1.0, 0.3));
+                    tones.push(gen_tone_freq(Default::default(), U0d32::FRAC_1_4 / 32, rng.gen_range(5e2..=8e2) * 1.0, 0.3));
+                    tones.push(gen_tone_freq(Default::default(), U0d32::FRAC_1_4 / 32, rng.gen_range(1.5e3..=2e3) * 1.0, 0.2));
+                    tones.push(gen_tone_freq(Default::default(), U0d32::FRAC_1_4 / 32, rng.gen_range(4e3..=4.5e3) * 1.0, 0.2));
+                    /*
+                    tones.push(gen_tone_freq(rng.gen(), rng.gen_range(5e2..=1e3)));
+                    tones.push(gen_tone_freq(rng.gen(), rng.gen_range(3e3..=4e3)));
+                    tones.push(gen_tone_freq(rng.gen(), rng.gen_range(3e3..=4e3)));
+                    tones.push(gen_tone_freq(rng.gen(), rng.gen_range(3e3..=4e3)));
+                    */
+                    trigger = true
+                }
+                for i in (0..tones.len()).rev() {
+                    if let Some(v) = sample_tone(&mut tones[i], dt) {
+                        *w += v;
+                    } else {
+                        tones.swap_remove(i);
+                    }
+                }
+                if t.frac().to_f32() > 0.9 {
+                    trigger = false
+                }
+                //*w *= 0.995 + rng.gen_range(0.0..=1.0) / 100.0;
+                //*w = rng.gen_range(-1.0..=1.0) / 10.0;
+                //*w *= (-t.frac().to_f32() * 20.0).exp();
+                std::io::Write::write_all(&mut out, &w.to_le_bytes()).unwrap();
+                t += U32d32::from(dt).wrapping_mul(U32d32::from(1));
+            }
+        },
+    );
+
+    (ret_sounds, sounds_handler)
 }

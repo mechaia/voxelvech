@@ -1,25 +1,35 @@
-use super::Block;
-use crate::Physics;
-use mechaia::{
-    math::{IVec3, Vec3},
-    physics3d::{
-        wheel::{VehicleBody, Wheel, WheelHandle, WheelSuspension},
-        ColliderHandle, ColliderProperties, RigidBodyHandle, SetRigidBodyProperties,
+use {
+    super::{sound::WheelSound, Block, BlockSet, BlockSetEntryData, VehicleSound},
+    crate::Physics,
+    mechaia::{
+        math::{IVec3, Vec3},
+        physics3d::{
+            wheel::{VehicleBody, Wheel, WheelHandle, WheelSuspension},
+            ColliderHandle, ColliderProperties, RigidBodyHandle, SetRigidBodyProperties,
+        },
+        util::{
+            math::fixed::{U0d32, U32d32},
+            Transform,
+        },
     },
-    util::Transform,
+    std::collections::HashMap,
 };
-use std::collections::HashMap;
 
 pub(super) struct Body {
     body: RigidBodyHandle,
     colliders: HashMap<IVec3, ColliderHandle>,
-    pub(super) pos_to_wheel: HashMap<IVec3, WheelHandle>,
+    pub(super) pos_to_wheel: HashMap<IVec3, WheelInfo>,
     pub(super) vehicle_body: VehicleBody,
 
     pub(super) prev_transform: Transform,
-    pub(super) prev_wheel_transforms: HashMap<WheelHandle, (Transform, Transform)>,
 
     pub(super) user_data: u32,
+}
+
+pub(super) struct WheelInfo {
+    pub handle: WheelHandle,
+    pub prev_axle: Transform,
+    pub prev_tire: Transform,
 }
 
 impl Body {
@@ -31,13 +41,19 @@ impl Body {
             vehicle_body: VehicleBody::new(),
 
             prev_transform: Transform::IDENTITY,
-            prev_wheel_transforms: Default::default(),
 
             user_data,
         }
     }
 
-    pub fn add(&mut self, physics: &mut Physics, pos: IVec3, block: &Block) {
+    pub fn add(
+        &mut self,
+        physics: &mut Physics,
+        sound: &mut VehicleSound,
+        block_set: &BlockSet,
+        pos: IVec3,
+        block: &Block,
+    ) {
         let h = physics.engine.add_collider(
             self.body,
             physics.shape_cache.unit_cube,
@@ -52,7 +68,7 @@ impl Body {
         self.colliders.insert(pos, h);
 
         // FIXME id yuck
-        if block.id == 4 {
+        if let BlockSetEntryData::Wheel { .. } = &block_set[block.id].data {
             let w = Wheel {
                 transform: Transform {
                     translation: pos.as_vec3(),
@@ -67,14 +83,21 @@ impl Body {
                     damp_per_velocity: 500.0,
                 },
             };
-            let w = self.vehicle_body.add_wheel(w);
-            self.pos_to_wheel.insert(pos, w);
-            let trfs = self.vehicle_body.wheel_local_transform(w);
-            self.prev_wheel_transforms.insert(w, trfs);
+            let handle = self.vehicle_body.add_wheel(w);
+            let (prev_axle, prev_tire) = self.vehicle_body.wheel_local_transform(handle);
+            self.pos_to_wheel.insert(
+                pos,
+                WheelInfo {
+                    handle,
+                    prev_axle,
+                    prev_tire,
+                },
+            );
+            sound.wheels.insert(pos, WheelSound::default());
         }
     }
 
-    pub fn remove(&mut self, physics: &mut Physics, pos: IVec3) {
+    pub fn remove(&mut self, physics: &mut Physics, sound: &mut VehicleSound, pos: IVec3) {
         let handle = self
             .colliders
             .remove(&pos)
@@ -82,17 +105,24 @@ impl Body {
         physics.engine.remove_collider(self.body, handle);
 
         if let Some(w) = self.pos_to_wheel.remove(&pos) {
-            self.vehicle_body.remove_wheel(w);
-            self.prev_wheel_transforms.remove(&w);
+            self.vehicle_body.remove_wheel(w.handle);
         }
     }
 
     pub fn step(&mut self, physics: &mut Physics) {
         self.prev_transform = self.transform(physics);
-        for (&w, trfs) in self.prev_wheel_transforms.iter_mut() {
-            *trfs = self.vehicle_body.wheel_local_transform(w);
+        for info in self.pos_to_wheel.values_mut() {
+            (info.prev_axle, info.prev_tire) = self.vehicle_body.wheel_local_transform(info.handle);
         }
         self.vehicle_body.apply(&mut physics.engine, self.body);
+    }
+
+    pub fn apply_sounds(&mut self, sound: &mut VehicleSound) {
+        for (pos, wheel) in self.pos_to_wheel.iter_mut() {
+            let snd = sound.wheels.get_mut(pos).unwrap();
+            snd.speed =
+                U32d32::from_f32(self.vehicle_body.wheel_angular_velocity(wheel.handle).abs());
+        }
     }
 
     pub fn transform(&self, physics: &Physics) -> Transform {
@@ -120,8 +150,7 @@ impl Body {
             physics.engine.remove_collider(self.body, c)
         }
         for (_, w) in self.pos_to_wheel.drain() {
-            self.vehicle_body.remove_wheel(w);
-            self.prev_wheel_transforms.remove(&w);
+            self.vehicle_body.remove_wheel(w.handle);
         }
     }
 

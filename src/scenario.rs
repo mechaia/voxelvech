@@ -8,7 +8,10 @@ use mechaia::{
     model::Collection,
     physics3d::{ColliderProperties, RigidBodyHandle},
     render::resource::camera::CameraView,
-    util::Transform,
+    util::{
+        math::fixed::{U0d32, U32d32},
+        Transform,
+    },
 };
 
 pub trait Scenario {

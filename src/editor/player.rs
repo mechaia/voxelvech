@@ -6,6 +6,7 @@ use crate::{
 use mechaia::{
     math::{IVec3, Vec3},
     render::resource::camera::CameraView,
+    util::Transform,
 };
 
 pub struct Player {
@@ -36,6 +37,7 @@ impl Player {
         state: &crate::State,
         physics: &mut Physics,
         vehicle: &mut Vehicle,
+        sounds: &mut super::Sounds,
     ) -> InputEffects {
         let input = |n| state.input.state.get_by_name(n);
         self.camera.add_pan(state.input("editor.camera.pan"));
@@ -88,14 +90,20 @@ impl Player {
 
                 if state.input_hold_or_edge_over("editor.place") {
                     let blk = Block::new(self.block_id, dir, *rot);
-                    vehicle.force_add(physics, &state.block_set, free, blk);
+                    vehicle.force_add(
+                        physics,
+                        &mut sounds.player_vehicle,
+                        &state.block_set,
+                        free,
+                        blk,
+                    );
                     vehicle_dirty = true;
                 }
             }
 
             // avoid simultaneous place and remove, which would cause weird effects.
             if state.input_hold_or_edge_over("editor.remove") && !vehicle_dirty {
-                vehicle.force_remove(physics, q.occupied);
+                vehicle.force_remove(physics, &mut sounds.player_vehicle, q.occupied);
                 vehicle_dirty = true;
             }
 
@@ -120,7 +128,7 @@ impl Player {
             if let Some(q) = &dmg_query {
                 let mut acc = DamageAccumulator::default();
                 acc.add_heat(q.occupied.as_vec3(), Vec3::X, 260);
-                vehicle.apply_damage(physics, acc);
+                vehicle.apply_damage(physics, &mut sounds.player_vehicle, acc);
 
                 query = vehicle.query_ray(
                     physics,
@@ -143,6 +151,10 @@ impl Player {
             vehicle_dirty,
             block_ghost,
         }
+    }
+
+    pub fn transform(&self) -> Transform {
+        self.camera.transform()
     }
 
     pub fn camera_to_render(&self, aspect: f32) -> CameraView {

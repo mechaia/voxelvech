@@ -53,7 +53,7 @@ impl BlockSet {
                     continue;
                 };
                 let name = &name[11..];
-                crate::log::debug(format!("adding {name}"));
+                crate::log::debug(format!("adding projectile {name}"));
 
                 let mechaia::model::Node::Leaf { model, .. } = node else {
                     panic!("todo: handle multi-mesh projectiles (or not?)");
@@ -74,7 +74,7 @@ impl BlockSet {
                     continue;
                 };
                 let name = &name[6..];
-                crate::log::debug(format!("adding {name}"));
+                crate::log::debug(format!("adding block {name}"));
 
                 let mechaia::model::Node::Leaf { model, .. } = node else {
                     panic!("todo: handle multi-mesh blocks (or not?)");
