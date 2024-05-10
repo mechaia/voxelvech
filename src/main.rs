@@ -16,9 +16,7 @@ use std::{
 
 use crate::{physics::Physics, scenario::Scenario, vehicle::BlockSet};
 use mechaia::{
-    input::{self, InputMap, InputState, KeyOrName},
-    model::Collection,
-    util::math::fixed::{U0d32, U32d32},
+    input::{self, InputMap, InputState, KeyOrName}, math::Vec3, model::Collection, util::math::fixed::{U0d32, U32d32}
 };
 
 const DEFAULT_INPUT_MAP: &str = include_str!("../data/inputmap_azerty.txt");
@@ -47,14 +45,27 @@ struct Sound {
     t: U32d32,
 }
 
-type SoundsHandler = Box<dyn FnMut(&mut [f32], u16, RangeInclusive<f32>, U0d32) + Send>;
+type SoundsHandler = Box<dyn FnMut(&mut DualReceptor<'_>) + Send>;
 
 struct SoundShared {
     f: SoundsHandler,
     prev_time: Instant,
     time: Instant,
     prev_interpolate: f32,
+    pan_factor: f32
 }
+
+struct DualReceptor<'a> {
+    buf: &'a mut [f32],
+    pan_factor: f32,
+    channels: u16,
+    dt: U0d32,
+    df: f32,
+    start_f: f32,
+}
+
+#[derive(Clone, Copy, Default)]
+struct PanFactor(f32);
 
 impl State {
     fn input(&self, name: &str) -> f32 {
@@ -76,16 +87,44 @@ impl State {
     }
 }
 
+impl<'a> DualReceptor<'a> {
+    fn add(&mut self, pan: PanFactor, mut f: impl FnMut(U0d32, f32) -> f32) {
+        for (i, w) in self.buf.chunks_mut(self.channels.into()).enumerate() {
+            let ff = self.start_f + (self.df * i as f32);
+            let v = f(self.dt, ff.clamp(0.0, 1.0));
+            match w {
+                [a] => *a += v,
+                [a, b] => {
+                    let gv = v * (1.0 - self.pan_factor);
+                    let pv = v * self.pan_factor;
+                    *a += gv + (pv * (1.0 - pan.0));
+                    *b += gv + (pv * pan.0);
+                }
+                _ => todo!("more than 2 channels"),
+            }
+        }
+    }
+}
+
+impl PanFactor {
+    pub fn from_dir(dir: Vec3) -> Self {
+        let pan = dir.normalize().dot(Vec3::Y);
+        Self((pan * 0.5) + 0.5)
+    }
+}
+
 fn main() {
     let mut window = mechaia::window::Window::new();
     let mut gfx = gfx::Gfx::new(&mut window);
 
     let time = Instant::now();
     let sound_data = Arc::new(Mutex::new(SoundShared {
-        f: Box::new(|data, _, _, _| data.fill(0.0)),
+        f: Box::new(|_| {}),
         prev_time: time,
         time,
         prev_interpolate: 1.0,
+        //pan_factor: 0.8,
+        pan_factor: 1.0,
     }));
     let mut sound = {
         let sound_data = sound_data.clone();
@@ -102,24 +141,30 @@ fn main() {
             data.time = interp_t;
             data.prev_interpolate = interpolate;
 
-            (data.f)(buf, channels, interpolate_range, dt);
+            let receptor = &mut DualReceptor {
+                pan_factor: data.pan_factor,
+                channels,
+                dt,
+                start_f: data.prev_interpolate,
+                df: (interpolate - data.prev_interpolate) / buf.len() as f32,
+                buf,
+            };
+
+            (data.f)(receptor);
         };
 
         Sound {
             dev: mechaia::sound::Dev::new(
                 &mechaia::sound::DevConfig {
                     //buffer_size: mechaia::sound::BufferSize::MaxLatency(U0d32::MAX / 100), // 10ms
-                    buffer_size: mechaia::sound::BufferSize::Fixed(4096),
-                    //channels: 2,
-                    channels: 1,
+                    buffer_size: mechaia::sound::BufferSize::MaxLatency(U0d32::MAX / 50), // 20ms
+                    //buffer_size: mechaia::sound::BufferSize::Fixed(4096),
+                    channels: 2,
                     sample_rate: 48000,
                 },
                 f,
             ),
             t: U32d32::ZERO,
-            //buffer_fill_target: 48000 / 100,
-            //buffer_fill_target: 4096,
-            //buffer_fill_target: 1024,
             sample_fill_target: 512 * 2,
         }
     };

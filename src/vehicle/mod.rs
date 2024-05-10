@@ -24,7 +24,7 @@ pub use {
     block::Block,
     block_set::{BlockSet, BlockSetEntry, BlockSetEntryData},
     damage::DamageAccumulator,
-    sound::VehicleSound,
+    sound::{GlobalSound, VehicleSound, LaserSound},
 };
 
 pub struct Vehicle {
@@ -313,7 +313,7 @@ impl Vehicle {
                     armature_index: *projectile_armature,
                 });
 
-                turret.next_fire = t.checked_add(Duration::from_secs(1)).unwrap();
+                turret.next_fire = t.checked_add(Duration::from_millis(500)).unwrap();
             }
         }
 
@@ -331,11 +331,14 @@ impl Vehicle {
         &mut self,
         physics: &mut Physics,
         sound: &mut VehicleSound,
+        global_sound: &mut GlobalSound,
         acc: DamageAccumulator,
     ) {
         let destroyed = acc.apply(&mut self.damage);
+        let trf = self.transform(physics);
         for pos in destroyed {
             self.physics.remove(physics, sound, pos);
+            global_sound.add_sound_break(trf.apply_to_translation(pos.as_vec3()));
         }
     }
 
