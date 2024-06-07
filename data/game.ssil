@@ -39,6 +39,10 @@ function game.physics.step() {
 	il.call game.physics.step
 }
 
+function game.graphics.draw() {
+	il.call game.graphics.draw
+}
+
 function game.graphics.load_gltf(ConstantString path) -> game.Gltf {
 	game.Gltf gltf
 	il.move game.graphics.load_gltf_in <- path
@@ -58,7 +62,10 @@ function game.vehicle.load_v0(ConstantString path) -> game.Vehicle {
 	return vehicle
 }
 
-function game.vehicle.step(ref Vehicle vehicle) {
+function game.vehicle.step(ref game.Vehicle vehicle) {
+}
+
+function game.vehicle.draw(game.Vehicle vehicle) {
 }
 
 function transform.new(Vec3 translation, Quat rotation) -> Transform {
@@ -143,4 +150,13 @@ function float32.add(Float32 x, Float32 y) -> Float32 {
 	il.call float32.add
 	il.move float32.out_0 -> x
 	return x
+}
+
+function float32.eq(Float32 x, Float32 y) -> Boolean {
+	Boolean b
+	il.move float32.in_0 <- x
+	il.move float32.in_1 <- y
+	il.call float32.eq
+	il.move boolean.out_0 -> b
+	return b
 }

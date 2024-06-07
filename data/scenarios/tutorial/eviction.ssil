@@ -8,23 +8,23 @@ record Menu {
 	ItemPicker items
 }
 
-union Ui {
+enum Ui {
 	Nothing
-	Menu Menu
+	Menu
 }
 
-union MaybeVehicle {
-	Dead
-	Live game.Vehicle
+record MaybeVehicle {
+	game.Vehicle vehicle
+	Boolean is_alive
 }
 
-union EnemyIndex {
+enum EnemyIndex {
 	A
 	B
 	C
 }
 
-union game.ProjectileIndex {
+enum game.ProjectileIndex {
 	R
 	S
 	T
@@ -47,10 +47,10 @@ register Boolean exit
 function start() {
 	map = game.graphics.load_gltf("map.gltf")
 
-	player = Live game.vehicle.load_v0("args:player.vvt")
-	enemies[A] = Live game.vehicle.load_v0("data:a.vvt")
-	enemies[B] = Live game.vehicle.load_v0("data:b.vvt")
-	enemies[C] = Live game.vehicle.load_v0("data:c.vvt")
+	player = load_vehicle("args:player.vvt")
+	enemies[A] = load_vehicle("data:a.vvt")
+	enemies[B] = load_vehicle("data:b.vvt")
+	enemies[C] = load_vehicle("data:c.vvt")
 
 	for ref projectile in projectiles {
 		projectile.start = transform.zero()
@@ -60,10 +60,17 @@ function start() {
 	loop {
 		step()
 		draw()
-		if true = exit {
+		if exit {
 			break
 		}
 	}
+}
+
+function load_vehicle(ConstantString path) -> MaybeVehicle {
+	MaybeVehicle v
+	v.vehicle = game.vehicle.load_v0(path)
+	v.is_alive = true
+	return v
 }
 
 function step() {
@@ -71,13 +78,13 @@ function step() {
 
 	game.physics.step()
 
-	if Live ref v = player {
-		game.vehicle.step(ref v)
+	if player.is_alive {
+		game.vehicle.step(ref player.vehicle)
 	}
 
-	for ref vehicle in scenario.enemies {
-		if Live ref v = vehicle {
-			game.vehicle.step(ref v)
+	for ref v in enemies {
+		if v.is_alive {
+			game.vehicle.step(ref v.vehicle)
 		}
 	}
 }
@@ -87,16 +94,18 @@ function draw() {
 
 	game.graphics.draw(map)
 
-	game.vehicle.draw(player)
+	if player.is_alive {
+		game.vehicle.draw(player.vehicle)
+	}
 
-	for ref vehicle in enemies {
-		if Some ref v = vehicle {
-			game.vehicle.draw(ref v)
+	for ref v in enemies {
+		if v.is_alive {
+			game.vehicle.draw(ref v.vehicle)
 		}
 	}
 
 	for p in projectiles {
-		if 0 = p.length {
+		if float32.eq(p.length, 0) {
 			break
 		}
 		Projectile.draw(p)

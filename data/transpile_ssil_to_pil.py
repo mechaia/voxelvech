@@ -106,10 +106,7 @@ class IlMove(Statement):
         return f'il.move {self.reg} {["<-", "->"][self.out]} {self.var}'
 
 class If(Statement):
-    def __init__(self, variant, value_ref, value, expr, scope):
-        self.variant = variant
-        self.value_ref = value_ref
-        self.value = value
+    def __init__(self, expr, scope):
         self.expr = expr
         self.scope = scope
 
@@ -147,15 +144,6 @@ class ExprCall(Expr):
 
     def __repr__(self):
         return f'{self.function}({", ".join(map(repr, self.args))})'
-
-class ExprUnionVariant(Expr):
-    def __init__(self, variant, expr):
-        assert isinstance(expr, Expr)
-        self.variant = variant
-        self.expr = expr
-
-    def __repr__(self):
-        return f'{self.variant} {self.expr}'
 
 class Scope:
     def __init__(self):
@@ -206,13 +194,10 @@ class ArrayType(Type):
 class Unit:
     def __init__(self):
         self.type_aliases = {}
+        self.enums = {}
         self.records = {}
-        self.unions = {}
         self.functions = {}
         self.registers = {}
-
-    def union_is_dataless(self, ty):
-        return all(ty is None for ty in self.unions[ty].values())
 
     def to_il(self):
         unit = self
@@ -275,12 +260,7 @@ class Unit:
                     else:
                         raise Exception(f'register "{name}" is shadowed')
                     self.registers[name] = regname, ty
-                    if ty in unit.unions:
-                        self.registers[f'{name}:tag'] = f'{regname}:tag', ty
-                        for variant, ty in unit.unions[ty].items():
-                            if ty is not None:
-                                self.registers[f'{name}:data:{variant}'] = f'{regname}:data:{variant}', ty
-                    elif ty in unit.records:
+                    if ty in unit.records:
                         for f_name, f_ty in unit.records[ty].items():
                             f(f_ty, f'{name}.{f_name}', f'{regname}.{f_name}')
                 f(ty, name, regname)
@@ -322,10 +302,9 @@ class Unit:
 
         fn_ty_step_memoize = set()
         def fn_ty_step_next(ty):
-            assert self.union_is_dataless(ty)
             name = f'{ty}:step.next'
             value = f'{ty}:step.next:value'
-            l = [*self.unions[ty]]
+            l = self.enums[ty]
             if ty in fn_ty_step_memoize:
                 return name, value, l[0]
             fn_ty_step_memoize.add(ty)
@@ -335,7 +314,9 @@ class Unit:
             extra_instructions.append(']\n')
             return name, value, l[0]
 
-        for name, variants in self.unions.items():
+        yield '$ $FLAG Boolean\n'
+
+        for name, variants in self.enums.items():
             yield f'% '
             yield name
             for v in variants:
@@ -381,7 +362,6 @@ class Unit:
                 assert False, repr((ty, path_or_value))
 
             def parse_expr(ctx, assign, expr, expect_ty):
-                print('>>>>>>', ctx, assign, expr, expect_ty)
                 if isinstance(expr, ExprCall):
                     call_fn = self.functions[expr.function]
                     arg_regs = functions_arg_to_reg[expr.function]
@@ -390,7 +370,8 @@ class Unit:
                         assert ty == expr_ty, f'{ty} == {expr_ty}'
                     yield from ('| ', expr.function, '\n')
                     if call_fn.ret_type is not None:
-                        assert assign is not None
+                        if assign is None:
+                            assign = add_temp_register(call_fn.ret_type)
                         reg = f'{expr.function}:return'
                         yield f'. {assign} {reg}\n'
                         return assign, call_fn.ret_type
@@ -405,14 +386,6 @@ class Unit:
                     instr = '.+'[is_value]
                     yield f'{instr} {assign} {reg_or_value}\n'
                     return assign, ty
-                elif isinstance(expr, ExprUnionVariant):
-                    assert expect_ty is not None
-                    tag_reg, _ = ctx.get_register(f'{assign}:tag')
-                    yield f'+ {tag_reg} {expr.variant}\n'
-                    if expr.expr is not None:
-                        data_reg, data_ty = ctx.get_register(f'{assign}:data:{expr.variant}')
-                        yield from parse_expr(ctx, data_reg, expr.expr, data_ty)
-                    return assign, expect_ty
                 else:
                     assert 0, repr(type(expr))
 
@@ -451,11 +424,14 @@ class Unit:
                         else:
                             yield ' '.join(('.', stmt.reg, var)) + '\n'
                     elif isinstance(stmt, Return):
-                        assert fn.ret_type is not None
                         if stmt.expr is not None:
+                            print(stmt.expr, fn.ret_type)
+                            assert fn.ret_type is not None
                             reg, ty = ctx.get_register('return')
                             assert ty == fn.ret_type
                             yield from parse_expr(ctx, reg, stmt.expr, fn.ret_type)
+                        else:
+                            assert fn.ret_type is None
                         yield '<\n'
                         return False
                     elif isinstance(stmt, Become):
@@ -485,7 +461,7 @@ class Unit:
                         loop_stack.pop()
 
                         if stmt.value_ref:
-                            yield f'{{ {array_reg} {index_reg} {value_reg}\n'
+                            yield '{' f' {array_reg} {index_reg} {value_reg}\n'
 
                         yield f'. {fn_step_reg} {index_reg}\n'
                         yield f'| {fn_step}\n'
@@ -522,16 +498,14 @@ class Unit:
                         next_block()
 
                         reg, ty = yield from parse_expr(ctx, None, stmt.expr, None)
-                        if stmt.value is not None:
-                            new_ctx.add_register(stmt.value, ty, reg)
 
                         yield f'= {new_ctx.name}.switch\n'
-                        yield f'[ {new_ctx.name}.switch {reg}:tag\n'
-                        yield f'? {stmt.variant} {new_ctx.name}\n'
+                        yield f'[ {new_ctx.name}.switch {reg}\n'
+                        yield f'? true {new_ctx.name}\n'
                         yield f'! {ctx.name}\n'
                         cont = yield from parse_scope(new_ctx, stmt.scope)
                         if cont:
-                            assert 0
+                            yield f'= {ctx.name}\n'
                         yield f'> {ctx.name}\n'
                     elif isinstance(stmt, Break):
                         yield f'= {loop_stack[-1].prev.name}\n'
@@ -611,15 +585,16 @@ def parse(text: str) -> Unit:
             return parse_expr_args(fn, tk), None
         if tk == '[':
             assert 0, 'array access'
-        # enum variant with associated data
-        value, tk = parse_expr(tk)
-        return ExprUnionVariant(fn, value), tk
+        raise Exception('can\'t parse this')
 
     def parse_expr_args(fn, tk):
         if fn is None:
             fn = next(tokens)
         args = []
         def expr_handler(tk):
+            if tk == 'ref':
+                # TODO ref
+                tk = next(tokens)
             expr, tk = parse_expr(tk)
             args.append(expr)
             return tk
@@ -667,9 +642,11 @@ def parse(text: str) -> Unit:
                     assert_next('\n')
                     break
                 if thing == 'return':
-                    if ret_type is None:
-                        raise Exception('return without return type is not valid')
-                    expr, tk = parse_expr()
+                    tk = next(tokens)
+                    if tk != '\n':
+                        expr, tk = parse_expr(tk)
+                    else:
+                        expr = None
                     if tk is None:
                         tk = next(tokens)
                     assert_is(tk, '\n')
@@ -709,22 +686,13 @@ def parse(text: str) -> Unit:
                     scope = parse_scope()
                     f.push(ForIn(index, value_ref, value, array, scope))
                 elif thing == 'if':
-                    variant = next(tokens)
-                    value = next(tokens)
-                    is_ref = value == 'ref'
-                    if is_ref:
-                        value = next(tokens)
-                    if value == '=':
-                        value = None
-                    else:
-                        assert_next('=')
                     expr, tk = parse_expr()
                     if tk is None:
                         tk = next(tokens)
                     assert_is(tk, '{')
                     assert_next('\n')
                     scope = parse_scope()
-                    f.push(If(variant, is_ref, value, expr, scope))
+                    f.push(If(expr, scope))
                 elif thing == 'break':
                     assert_next('\n')
                     f.push(Break())
@@ -774,7 +742,7 @@ def parse(text: str) -> Unit:
         record = next(tokens)
         assert_next('{')
         assert_next('\n')
-        if record in unit.records or record in unit.unions:
+        if record in unit.records or record in unit.enums:
             raise Exception(f'record "{record}" already defined')
         fields = {}
         while True:
@@ -790,29 +758,22 @@ def parse(text: str) -> Unit:
             fields[field] = ty
         unit.records[record] = fields
 
-    def handle_union():
-        union = next(tokens)
+    def handle_enum():
+        enum = next(tokens)
         assert_next('{')
         assert_next('\n')
-        if union in unit.unions or union in unit.records:
-            raise Exception(f'union "{union}" already defined')
-        variants = {}
+        if enum in unit.enums or enum in unit.records:
+            raise Exception(f'enum "{enum}" already defined')
+        variants = []
         while True:
-            tk = next(tokens)
-            if tk == '}':
-                assert_next('\n')
+            variant = next(tokens)
+            assert_next('\n')
+            if variant == '}':
                 break
-            variant = tk
-            tk = next(tokens)
-            if tk == '\n':
-                value = None
-            else:
-                value = tk
-                assert_next('\n')
             if variant in variants:
-                raise Exception(f'variant "{variant}" in union "{union}" already defined')
-            variants[variant] = value
-        unit.unions[union] = variants
+                raise Exception(f'variant "{variant}" in enum "{enum}" already defined')
+            variants.append(variant)
+        unit.enums[enum] = variants
 
     def handle_register():
         ty = next(tokens)
@@ -840,8 +801,8 @@ def parse(text: str) -> Unit:
         'function': handle_function,
         'il.type': handle_il_type,
         'record': handle_record,
+        'enum': handle_enum,
         'register': handle_register,
-        'union': handle_union,
         '\n': lambda: None,
     }
 
@@ -861,11 +822,11 @@ if __name__ == '__main__':
 
     unit = parse(text)
 
+    print('Enums:')
+    for name, rec in unit.enums.items():
+        print(' ', name, rec)
     print('Records:')
     for name, rec in unit.records.items():
-        print(' ', name, rec)
-    print('Unions:')
-    for name, rec in unit.unions.items():
         print(' ', name, rec)
     print('Type aliases:')
     for name, rec in unit.type_aliases.items():
