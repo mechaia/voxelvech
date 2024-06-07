@@ -1,0 +1,146 @@
+record Quat {
+	Float32 w
+	Float32 x
+	Float32 y
+	Float32 z
+}
+
+record Vec3 {
+	Float32 x
+	Float32 y
+	Float32 z
+}
+
+record Transform {
+	Quat rotation
+	Vec3 translation
+}
+
+alias.type game.ProjectileIndex = Natural12
+alias.type game.ProjectileCount = Natural_4096
+
+il.type game.Vehicle
+il.type game.Gltf
+
+function game.start() {
+	game.physics.init()
+	become start()
+}
+
+function game.wait_step() {
+	il.call game.wait_step
+}
+
+function game.wait_draw() {
+	il.call game.wait_draw
+}
+
+function game.physics.step() {
+	il.call game.physics.step
+}
+
+function game.graphics.load_gltf(ConstantString path) -> game.Gltf {
+	game.Gltf gltf
+	il.move game.graphics.load_gltf_in <- path
+	il.call game.graphics.load_gltf
+	il.move game.graphics.load_gltf_out -> gltf
+	return gltf
+}
+
+function game.physics.init() {
+}
+
+function game.vehicle.load_v0(ConstantString path) -> game.Vehicle {
+	game.Vehicle vehicle
+	il.move game.vehicle.load_in <- path
+	il.call game.vehicle.load_v0
+	il.move game.vehicle.load_out -> vehicle
+	return vehicle
+}
+
+function game.vehicle.step(ref Vehicle vehicle) {
+}
+
+function transform.new(Vec3 translation, Quat rotation) -> Transform {
+	Transform t
+	t.rotation = rotation
+	t.translation = translation
+	return t
+}
+
+function transform.zero() -> Transform {
+	return transform.new(vec3.zero(), quat.zero())
+}
+
+function quat.new(Float32 w, Float32 x, Float32 y, Float32 z) -> Quat {
+	Quat q
+	q.w = w
+	q.x = x
+	q.y = y
+	q.z = z
+	return q
+}
+
+function quat.unit() -> Quat {
+	return quat.new(1, 0, 0, 0)
+}
+
+function quat.zero() -> Quat {
+	return quat.new(0, 0, 0, 0)
+}
+
+function vec3.new(Float32 x, Float32 y, Float32 z) -> Vec3 {
+	Vec3 v
+	v.x = x
+	v.y = y
+	v.z = z
+	return v
+}
+
+function vec3.zero() -> Vec3 {
+	return vec3.new(0, 0, 0)
+}
+
+function vec3.one() -> Vec3 {
+	return vec3.new(1, 1, 1)
+}
+
+function vec3.x() -> Vec3 {
+	return vec3.new(1, 0, 0)
+}
+
+function vec3.y() -> Vec3 {
+	return vec3.new(0, 1, 0)
+}
+
+function vec3.z() -> Vec3 {
+	return vec3.new(0, 0, 1)
+}
+
+function vec3.element_mul(Vec3 a, Vec3 b) -> Vec3 {
+	return vec3.new(float32.mul(a.x, b.x), float32.mul(a.y, b.y), float32.mul(a.z, b.z))
+}
+
+function vec3.element_sum(Vec3 v) -> Float32 {
+	return float32.add(float32.add(v.x, v.y), v.z)
+}
+
+function vec3.length_squared(Vec3 v) -> Float32 {
+	return vec3.element_sum(vec3.element_mul(v, v))
+}
+
+function float32.mul(Float32 x, Float32 y) -> Float32 {
+	il.move float32.in_0 <- x
+	il.move float32.in_1 <- y
+	il.call float32.mul
+	il.move float32.out_0 -> x
+	return x
+}
+
+function float32.add(Float32 x, Float32 y) -> Float32 {
+	il.move float32.in_0 <- x
+	il.move float32.in_1 <- y
+	il.call float32.add
+	il.move float32.out_0 -> x
+	return x
+}

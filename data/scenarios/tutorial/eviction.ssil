@@ -1,0 +1,107 @@
+record Projectile {
+	Transform start
+	Float32 length
+	Boolean player
+}
+
+record Menu {
+	ItemPicker items
+}
+
+union Ui {
+	Nothing
+	Menu Menu
+}
+
+union MaybeVehicle {
+	Dead
+	Live game.Vehicle
+}
+
+union EnemyIndex {
+	A
+	B
+	C
+}
+
+union game.ProjectileIndex {
+	R
+	S
+	T
+	U
+}
+
+register game.Gltf map
+
+register MaybeVehicle player
+register [EnemyIndex -> MaybeVehicle] enemies
+
+register [game.ProjectileIndex -> Projectile] projectiles
+
+register game.Mesh projectile_mesh
+register game.Material projectile_material_player
+register game.Material projectile_material_enemy
+
+register Boolean exit
+
+function start() {
+	map = game.graphics.load_gltf("map.gltf")
+
+	player = Live game.vehicle.load_v0("args:player.vvt")
+	enemies[A] = Live game.vehicle.load_v0("data:a.vvt")
+	enemies[B] = Live game.vehicle.load_v0("data:b.vvt")
+	enemies[C] = Live game.vehicle.load_v0("data:c.vvt")
+
+	for ref projectile in projectiles {
+		projectile.start = transform.zero()
+		projectile.length = 0
+	}
+
+	loop {
+		step()
+		draw()
+		if true = exit {
+			break
+		}
+	}
+}
+
+function step() {
+	game.wait_step()
+
+	game.physics.step()
+
+	if Live ref v = player {
+		game.vehicle.step(ref v)
+	}
+
+	for ref vehicle in scenario.enemies {
+		if Live ref v = vehicle {
+			game.vehicle.step(ref v)
+		}
+	}
+}
+
+function draw() {
+	game.wait_draw()
+
+	game.graphics.draw(map)
+
+	game.vehicle.draw(player)
+
+	for ref vehicle in enemies {
+		if Some ref v = vehicle {
+			game.vehicle.draw(ref v)
+		}
+	}
+
+	for p in projectiles {
+		if 0 = p.length {
+			break
+		}
+		Projectile.draw(p)
+	}
+}
+
+function Projectile.draw(Projectile projectile) {
+}
