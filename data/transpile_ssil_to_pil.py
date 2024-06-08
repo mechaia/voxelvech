@@ -174,6 +174,15 @@ class Arg:
     def __repr__(self):
         return f'{("", "ref ")[self.is_ref]}{self.ty} {self.name}'
 
+class IlFunction:
+    def __init__(self, args, ret_type, ret_reg):
+        self.args = args
+        self.ret_type = ret_type
+        self.ret_reg = ret_reg
+
+    def __repr__(self):
+        return repr({'args': self.args, 'ret_type': self.ret_type, 'ret_reg': self.ret_reg})
+
 class Type: pass
 
 class UnitType(Type):
@@ -223,13 +232,6 @@ class Unit:
         def add_register(regname, ty):
             registers.append((regname, ty))
 
-        def add_temp_register(ty):
-            nonlocal temp_register_counter
-            regname = f'${temp_register_counter}'
-            temp_register_counter += 1
-            add_register(regname, ty)
-            return regname
-
         class Context:
             def __init__(self, prev, name):
                 assert prev is None or isinstance(prev, Context)
@@ -240,16 +242,17 @@ class Unit:
                 self.registers = {}
                 self.array_registers = {}
 
-            def _gen_tempreg(self):
+            def _gen_tempreg(self, name):
                 nonlocal temp_register_counter
-                regname = f'{self.name}:{temp_register_counter}'
+                regname = f'{self.name}:${temp_register_counter}'
                 temp_register_counter += 1
                 return regname
 
             def add_register(self, name, ty, regname = None):
+                assert name is None or isinstance(name, str)
                 assert isinstance(ty, str)
 
-                regname = self._gen_tempreg() if regname is None else regname
+                regname = self._gen_tempreg(name) if regname is None else regname
 
                 def f(ty, name, regname):
                     try:
@@ -263,7 +266,8 @@ class Unit:
                     if ty in unit.records:
                         for f_name, f_ty in unit.records[ty].items():
                             f(f_ty, f'{name}.{f_name}', f'{regname}.{f_name}')
-                f(ty, name, regname)
+                if name is not None:
+                    f(ty, name, regname)
 
                 add_register(regname, ty)
                 return regname
@@ -314,8 +318,6 @@ class Unit:
             extra_instructions.append(']\n')
             return name, value, l[0]
 
-        yield '$ $FLAG Boolean\n'
-
         for name, variants in self.enums.items():
             yield f'% '
             yield name
@@ -347,10 +349,16 @@ class Unit:
         for name, fn in self.functions.items():
             args = []
             for a in fn.args:
-                args.append((a.ty, a.name))
+                if isinstance(fn, IlFunction):
+                    args.append((a.ty, a.name))
+                else:
+                    args.append((a.ty, f'{name}:{a.name}'))
             functions_arg_to_reg[name] = args
 
         for name, fn in self.functions.items():
+            if isinstance(fn, IlFunction):
+                continue
+
             def get_reg_or_value(ctx, ty, path_or_value):
                 try:
                     return *ctx.get_register(path_or_value), False
@@ -370,10 +378,14 @@ class Unit:
                         assert ty == expr_ty, f'{ty} == {expr_ty}'
                     yield from ('| ', expr.function, '\n')
                     if call_fn.ret_type is not None:
+                        if isinstance(call_fn, IlFunction):
+                            reg = call_fn.ret_reg
+                        else:
+                            reg = f'{expr.function}:return'
                         if assign is None:
-                            assign = add_temp_register(call_fn.ret_type)
-                        reg = f'{expr.function}:return'
-                        yield f'. {assign} {reg}\n'
+                            assign = reg
+                        if assign != reg:
+                            yield f'. {assign} {reg}\n'
                         return assign, call_fn.ret_type
                 elif isinstance(expr, ExprValue):
                     reg_or_value, ty, is_value = get_reg_or_value(ctx, expect_ty, expr.value)
@@ -381,7 +393,7 @@ class Unit:
                         assert expect_ty is not None
                         ty = expect_ty
                     if assign is None:
-                        assign = add_temp_register(ty)
+                        assign = ctx.add_register(None, ty)
                     assert expect_ty is None or ty == expect_ty, f'{ty} == {expect_ty}'
                     instr = '.+'[is_value]
                     yield f'{instr} {assign} {reg_or_value}\n'
@@ -425,7 +437,6 @@ class Unit:
                             yield ' '.join(('.', stmt.reg, var)) + '\n'
                     elif isinstance(stmt, Return):
                         if stmt.expr is not None:
-                            print(stmt.expr, fn.ret_type)
                             assert fn.ret_type is not None
                             reg, ty = ctx.get_register('return')
                             assert ty == fn.ret_type
@@ -791,6 +802,31 @@ def parse(text: str) -> Unit:
             raise Exception(f'register "{name}" already defined')
         unit.registers[name] = ty
 
+    def handle_il_function():
+        name = next(tokens)
+        if name in unit.functions:
+            raise Exception(f'function "{name}" already defined')
+
+        args = []
+        def arg_handler(ty):
+            is_ref = ty == 'ref'
+            if is_ref:
+                ty = next_without_nl()
+            reg = next_without_nl()
+            args.append(Arg(is_ref, ty, reg))
+        parse_args(arg_handler)
+
+        tk = assert_next(('\n', '->'))
+        ret_type = None
+        if tk == '->':
+            ret_type = next(tokens)
+            ret_reg = next(tokens)
+            ret = ret_type, ret_reg
+            assert_next('\n')
+        else:
+            ret_type = ret_reg = None
+        unit.functions[name] = IlFunction(args, ret_type, ret_reg)
+
     def handle_il_type():
         # TODO what do?
         ty = next(tokens)
@@ -799,6 +835,7 @@ def parse(text: str) -> Unit:
     keyword_handlers = {
         'alias.type': handle_alias_type,
         'function': handle_function,
+        'il.function': handle_il_function,
         'il.type': handle_il_type,
         'record': handle_record,
         'enum': handle_enum,
@@ -834,8 +871,11 @@ if __name__ == '__main__':
     print('Functions:')
     for name, fn in unit.functions.items():
         print(' ', name)
-        for stmt in fn.root.statements:
-            print('   ', stmt)
+        if isinstance(fn, IlFunction):
+            print('(il.function)')
+        else:
+            for stmt in fn.root.statements:
+                print('   ', stmt)
 
     for s in unit.to_il():
         print(s, end='')

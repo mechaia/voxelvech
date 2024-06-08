@@ -27,46 +27,15 @@ function game.start() {
 	become start()
 }
 
-function game.wait_step() {
-	il.call game.wait_step
-}
-
-function game.wait_draw() {
-	il.call game.wait_draw
-}
-
-function game.physics.step() {
-	il.call game.physics.step
-}
-
-function game.graphics.draw() {
-	il.call game.graphics.draw
-}
-
-function game.graphics.load_gltf(ConstantString path) -> game.Gltf {
-	game.Gltf gltf
-	il.move game.graphics.load_gltf_in <- path
-	il.call game.graphics.load_gltf
-	il.move game.graphics.load_gltf_out -> gltf
-	return gltf
-}
-
-function game.physics.init() {
-}
-
-function game.vehicle.load_v0(ConstantString path) -> game.Vehicle {
-	game.Vehicle vehicle
-	il.move game.vehicle.load_in <- path
-	il.call game.vehicle.load_v0
-	il.move game.vehicle.load_out -> vehicle
-	return vehicle
-}
-
-function game.vehicle.step(ref game.Vehicle vehicle) {
-}
-
-function game.vehicle.draw(game.Vehicle vehicle) {
-}
+il.function game.wait_step()
+il.function game.wait_draw()
+il.function game.graphics.draw()
+il.function game.graphics.load_gltf(ConstantString game.graphics.load_gltf.in) -> game.Gltf game.graphics.load_gltf.out
+il.function game.physics.init()
+il.function game.physics.step()
+il.function game.vehicle.load_v0(ConstantString game.vehicle.load.in) -> game.Vehicle game.vehicle.load.out
+il.function game.vehicle.step(ref game.Vehicle vehicle)
+il.function game.vehicle.draw(game.Vehicle vehicle)
 
 function transform.new(Vec3 translation, Quat rotation) -> Transform {
 	Transform t
@@ -136,27 +105,6 @@ function vec3.length_squared(Vec3 v) -> Float32 {
 	return vec3.element_sum(vec3.element_mul(v, v))
 }
 
-function float32.mul(Float32 x, Float32 y) -> Float32 {
-	il.move float32.in_0 <- x
-	il.move float32.in_1 <- y
-	il.call float32.mul
-	il.move float32.out_0 -> x
-	return x
-}
-
-function float32.add(Float32 x, Float32 y) -> Float32 {
-	il.move float32.in_0 <- x
-	il.move float32.in_1 <- y
-	il.call float32.add
-	il.move float32.out_0 -> x
-	return x
-}
-
-function float32.eq(Float32 x, Float32 y) -> Boolean {
-	Boolean b
-	il.move float32.in_0 <- x
-	il.move float32.in_1 <- y
-	il.call float32.eq
-	il.move boolean.out_0 -> b
-	return b
-}
+il.function float32.add(Float32 float32.in_0, Float32 float32.in_1) -> Float32 float32.out_0
+il.function float32.mul(Float32 float32.in_0, Float32 float32.in_1) -> Float32 float32.out_0
+il.function float32.eq(Float32 float32.in_0, Float32 float32.in_1) -> Boolean boolean.out_0
