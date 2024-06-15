@@ -24,7 +24,7 @@ pub use {
     block::Block,
     block_set::{BlockSet, BlockSetEntry, BlockSetEntryData},
     damage::DamageAccumulator,
-    sound::{GlobalSound, VehicleSound, LaserSound},
+    sound::{GlobalSound, LaserSound, VehicleSound},
 };
 
 pub struct Vehicle {

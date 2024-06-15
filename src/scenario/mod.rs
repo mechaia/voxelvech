@@ -1,3 +1,5 @@
+pub mod pil;
+
 use crate::{
     gfx::{Draw, Gfx, MeshSetHandle},
     physics::Physics,
@@ -15,10 +17,14 @@ use mechaia::{
 };
 
 pub trait Scenario {
-    fn step(&mut self, state: &mut State);
-    fn camera(&self, aspect: f32) -> CameraView;
+    fn step(&mut self, state: &mut State, gfx: &mut Gfx);
     fn draw(&mut self, state: &mut State, draw: &mut Draw<'_>);
+    fn camera(&self, aspect: f32) -> CameraView;
     fn destroy(self: Box<Self>, state: &mut State, gfx: &mut Gfx);
+}
+
+pub struct ScenarioInfo {
+    pub description: Box<str>,
 }
 
 pub struct World {

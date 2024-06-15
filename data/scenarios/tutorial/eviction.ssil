@@ -1,116 +1,42 @@
-record Projectile {
-	Transform start
-	Float32 length
-	Boolean player
-}
+include "../../game.ssil"
 
-record Menu {
-	ItemPicker items
-}
+register game_Gltf assets
+register game_MeshSet mesh_set
 
-enum Ui {
-	Nothing
-	Menu
-}
+register game_Vehicle player
+register [Int2 -> game_Vehicle] enemies
 
-record MaybeVehicle {
-	game.Vehicle vehicle
-	Boolean is_alive
-}
-
-enum EnemyIndex {
-	A
-	B
-	C
-}
-
-enum game.ProjectileIndex {
-	R
-	S
-	T
-	U
-}
-
-register game.Gltf map
-
-register MaybeVehicle player
-register [EnemyIndex -> MaybeVehicle] enemies
-
-register [game.ProjectileIndex -> Projectile] projectiles
-
-register game.Mesh projectile_mesh
-register game.Material projectile_material_player
-register game.Material projectile_material_enemy
-
-register Boolean exit
+register Int32 projectile_mesh
+register game_Material projectile_material_player
+register game_Material projectile_material_enemy
 
 function start() {
-	map = game.graphics.load_gltf("map.gltf")
+	assets = game_gltf_load_const_str("data:map.glb")
+	mesh_set = game_graphics_add_mesh_set(assets)
 
-	player = load_vehicle("args:player.vvt")
-	enemies[A] = load_vehicle("data:a.vvt")
-	enemies[B] = load_vehicle("data:b.vvt")
-	enemies[C] = load_vehicle("data:c.vvt")
+	game_arg_const_str("player_vehicle")
+	player = game_vehicle_load_v0()
 
-	for ref projectile in projectiles {
-		projectile.start = transform.zero()
-		projectile.length = 0
-	}
+	enemies[0] = game_vehicle_load_v0_const_str("data:a.vvt")
+	enemies[1] = game_vehicle_load_v0_const_str("data:b.vvt")
+	enemies[2] = game_vehicle_load_v0_const_str("data:c.vvt")
 
-	loop {
-		step()
-		draw()
-		if exit {
-			break
-		}
-	}
+	become _loop()
 }
 
-function load_vehicle(ConstantString path) -> MaybeVehicle {
-	MaybeVehicle v
-	v.vehicle = game.vehicle.load_v0(path)
-	v.is_alive = true
-	return v
+function _loop() {
+	if game_wait() {
+		become draw()
+	}
+	become step()
 }
 
 function step() {
-	game.wait_step()
-
-	game.physics.step()
-
-	if player.is_alive {
-		game.vehicle.step(ref player.vehicle)
-	}
-
-	for ref v in enemies {
-		if v.is_alive {
-			game.vehicle.step(ref v.vehicle)
-		}
-	}
+	become _loop()
 }
 
 function draw() {
-	game.wait_draw()
-
-	game.graphics.draw(map)
-
-	if player.is_alive {
-		game.vehicle.draw(player.vehicle)
-	}
-
-	for ref v in enemies {
-		if v.is_alive {
-			game.vehicle.draw(ref v.vehicle)
-		}
-	}
-
-	for p in projectiles {
-		if float32.eq(p.length, 0) {
-			break
-		}
-		Projectile.draw(p)
-	}
-}
-
-function Projectile.draw(Projectile projectile) {
+	game_graphics_draw_push_transform(transform_new(vec3_new(5, 2, -1), UNIT))
+	game_graphics_draw_mesh(mesh_set, 0, 0)
+	become _loop()
 }

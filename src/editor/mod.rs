@@ -6,7 +6,7 @@ use crate::{
     log,
     physics::Physics,
     scenario::World,
-    vehicle::{self, Block, BlockSet, DamageAccumulator, Vehicle, VehicleSound, LaserSound},
+    vehicle::{self, Block, BlockSet, DamageAccumulator, LaserSound, Vehicle, VehicleSound},
     Scenario,
 };
 use mechaia::{
@@ -68,6 +68,7 @@ enum Ui {
     Load(ItemPicker),
     Save(ItemPicker),
     Spawn(ItemPicker),
+    Scenario(ItemPicker),
 }
 
 impl Autosaver {
@@ -222,6 +223,7 @@ impl Editor {
                         "reset vehicle",
                         "spawn enemy",
                         "remove enemies",
+                        "scenario",
                         "save",
                         "load",
                         "exit",
@@ -282,6 +284,13 @@ impl Editor {
                             reset_vehicle_transform(&mut self.physics, &mut self.player_vehicle);
                             self.player_vehicle.reset_damage(&state.block_set);
                             self.set_ui(Ui::Nothing);
+                        }
+                        "scenario" => {
+                            self.set_ui(Ui::Scenario(ItemPicker {
+                                items: state.scenarios.keys().cloned().collect::<Vec<_>>(),
+                                selected: 0,
+                                filter: "".to_string(),
+                            }));
                         }
                         s => todo!("{s}"),
                     }
@@ -372,6 +381,11 @@ impl Editor {
                     };
                 }
             }
+            Ui::Scenario(picker) => {
+                if let Some(item) = picker.handle_input(state) {
+                    todo!();
+                }
+            }
         }
     }
 
@@ -443,14 +457,17 @@ impl Editor {
 
                 // sound stuff
                 for p in proj.iter() {
-                    snd.all_vehicles.lasers.push((p.start.translation, LaserSound {
-                        pitch_decay: 40.0,
-                        //dt_factor: U32d32::ONE * 10000,
-                        dt_factor: U32d32::ONE * 4000,
-                        volume: Default::default(),
-                        t: Default::default(),
-                        pan: crate::PanFactor(0.0), // FIXME
-                    }));
+                    snd.all_vehicles.lasers.push((
+                        p.start.translation,
+                        LaserSound {
+                            pitch_decay: 40.0,
+                            //dt_factor: U32d32::ONE * 10000,
+                            dt_factor: U32d32::ONE * 4000,
+                            volume: Default::default(),
+                            t: Default::default(),
+                            pan: crate::PanFactor(0.0), // FIXME
+                        },
+                    ));
                 }
             }
 
@@ -492,7 +509,7 @@ impl Editor {
 }
 
 impl Scenario for Editor {
-    fn step(&mut self, state: &mut crate::State) {
+    fn step(&mut self, state: &mut crate::State, gfx: &mut Gfx) {
         self.block_ghost = if matches!(&self.ui, Ui::Nothing) {
             let res = {
                 let mut snd = self.sounds.lock().unwrap();
@@ -526,8 +543,7 @@ impl Scenario for Editor {
             let v_trf = self.player_vehicle.transform(&mut self.physics);
             let p_trf = self.player.transform();
             let w2v = p_trf.inverse();
-            snd.player_vehicle
-                .update(&w2v.apply_to_transform(&v_trf));
+            snd.player_vehicle.update(&w2v.apply_to_transform(&v_trf));
             for v in snd.enemy_vehicles.iter_mut() {
                 v.update(&w2v.apply_to_transform(&v_trf));
             }
@@ -591,14 +607,16 @@ impl Scenario for Editor {
             let trfs = [tail_trf, head_trf].map(|x| x.into());
             draw.collector
                 .solid
-                .push(state.block_set.mesh_set(), mesh as _, 1, &trfs)
+                .push(state.block_set.mesh_set(), mesh as _, 3, &trfs)
         }
 
         crate::gui::draw_logbox(draw);
         match &self.ui {
             Ui::Nothing => gui::draw_crosshair(draw),
-            Ui::Menu(p) | Ui::Load(p) | Ui::Spawn(p) => p.render(draw.viewport_rect(), draw),
-            _ => {}
+            Ui::Menu(p) | Ui::Load(p) | Ui::Spawn(p) | Ui::Scenario(p) => {
+                p.render(draw.viewport_rect(), draw)
+            }
+            Ui::Save(_) => todo!(),
         }
     }
 
@@ -645,19 +663,17 @@ fn new_sounds_handler(
 ) -> (half::Half<half::Left, Mutex<Sounds>>, crate::SoundsHandler) {
     let (ret_sounds, sounds) = half::half(Mutex::new(sounds));
 
-    let sounds_handler = Box::new(
-        move |receptor: &mut crate::DualReceptor<'_>| {
-            let mut snd = sounds.lock().unwrap();
-            if snd.paused {
-                return;
-            }
-            snd.player_vehicle.next_samples(receptor);
-            for v in snd.enemy_vehicles.iter_mut() {
-                v.next_samples(receptor);
-            }
-            snd.all_vehicles.next_samples(receptor);
-        },
-    );
+    let sounds_handler = Box::new(move |receptor: &mut crate::DualReceptor<'_>| {
+        let mut snd = sounds.lock().unwrap();
+        if snd.paused {
+            return;
+        }
+        snd.player_vehicle.next_samples(receptor);
+        for v in snd.enemy_vehicles.iter_mut() {
+            v.next_samples(receptor);
+        }
+        snd.all_vehicles.next_samples(receptor);
+    });
 
     (ret_sounds, sounds_handler)
 }

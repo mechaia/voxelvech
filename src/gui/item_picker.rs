@@ -61,7 +61,7 @@ impl ItemPicker {
             }
         }
 
-        select.map(|i| &*self.items[i])
+        select.and_then(|i| self.items.get(i)).map(|s| &**s)
     }
 
     pub fn next_item(&mut self) {
@@ -72,7 +72,10 @@ impl ItemPicker {
     }
 
     pub fn prev_item(&mut self) {
-        self.selected = self.selected.checked_sub(1).unwrap_or(self.items.len() - 1);
+        self.selected = self
+            .selected
+            .checked_sub(1)
+            .unwrap_or(self.items.len().saturating_sub(1));
     }
 
     fn advance(&mut self, f: impl Fn(&mut Self)) {
@@ -89,7 +92,10 @@ impl ItemPicker {
     }
 
     fn is_filtered(&self, index: usize) -> bool {
-        !self.items[index].starts_with(&self.filter)
+        !self
+            .items
+            .get(index)
+            .is_some_and(|w| w.starts_with(&self.filter))
     }
 
     pub fn render(&self, rect: Rect, draw: &mut Draw<'_>) {

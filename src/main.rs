@@ -8,15 +8,22 @@ mod physics;
 mod scenario;
 mod vehicle;
 
+use crate::{
+    physics::Physics,
+    scenario::{Scenario, ScenarioInfo},
+    vehicle::BlockSet,
+};
+use mechaia::{
+    input::{self, InputMap, InputState, KeyOrName},
+    math::Vec3,
+    model::Collection,
+    util::math::fixed::{U0d32, U32d32},
+};
 use std::{
+    collections::BTreeMap,
     ops::RangeInclusive,
     sync::{Arc, Mutex},
     time::{Duration, Instant},
-};
-
-use crate::{physics::Physics, scenario::Scenario, vehicle::BlockSet};
-use mechaia::{
-    input::{self, InputMap, InputState, KeyOrName}, math::Vec3, model::Collection, util::math::fixed::{U0d32, U32d32}
 };
 
 const DEFAULT_INPUT_MAP: &str = include_str!("../data/inputmap_azerty.txt");
@@ -26,6 +33,7 @@ struct State {
     block_set: BlockSet,
     input: Input,
     time: Time,
+    scenarios: BTreeMap<Box<str>, ScenarioInfo>,
 }
 
 struct Input {
@@ -41,8 +49,6 @@ struct Time {
 
 struct Sound {
     dev: mechaia::sound::Dev,
-    sample_fill_target: usize,
-    t: U32d32,
 }
 
 type SoundsHandler = Box<dyn FnMut(&mut DualReceptor<'_>) + Send>;
@@ -52,7 +58,7 @@ struct SoundShared {
     prev_time: Instant,
     time: Instant,
     prev_interpolate: f32,
-    pan_factor: f32
+    pan_factor: f32,
 }
 
 struct DualReceptor<'a> {
@@ -164,8 +170,6 @@ fn main() {
                 },
                 f,
             ),
-            t: U32d32::ZERO,
-            sample_fill_target: 512 * 2,
         }
     };
 
@@ -193,11 +197,26 @@ fn main() {
             now,
             delta: 0.0,
         },
+        scenarios: Default::default(),
     };
 
-    let (scenario, sound_handler) = editor::Editor::new(&mut state, &mut gfx);
-    let mut scenario = Box::new(scenario);
-    sound_data.lock().unwrap().f = sound_handler;
+    let mut scenario: Box<dyn Scenario>;
+    {
+        let mut args = std::env::args().skip(1);
+
+        (scenario, sound_data.lock().unwrap().f) = match args.next().as_deref() {
+            Some("scenario") => {
+                let script = args.next().unwrap();
+                let (a, b) = scenario::pil::PilScenario::new(&script, &mut state, &mut gfx);
+                (Box::new(a) as Box<dyn Scenario>, b)
+            }
+            Some(s) => todo!("{s:?}"),
+            None => {
+                let (a, b) = editor::Editor::new(&mut state, &mut gfx);
+                (Box::new(a) as Box<dyn Scenario>, b)
+            }
+        };
+    };
 
     'lp: loop {
         state.input.state.clear_events();
@@ -248,7 +267,7 @@ fn main() {
             data.time = state.time.now;
             data.prev_interpolate = 0.0;
         }
-        scenario.step(&mut state);
+        scenario.step(&mut state, &mut gfx);
 
         let camera = scenario.camera(window.aspect());
 

@@ -5,7 +5,7 @@ use mechaia::{
     render::{
         resource::{
             camera::{Camera, CameraView},
-            material::pbr::{PbrMaterial, PbrMaterialSet},
+            material::pbr::{PbrFlags, PbrMaterial, PbrMaterialSet},
             mesh::{Mesh, MeshSet},
             texture::{Texture, TextureFormat, TextureView},
             Shared,
@@ -83,6 +83,7 @@ impl Gfx {
                 roughness_texture: tex_white,
                 metallic_texture: tex_white,
                 ambient_occlusion_texture: tex_white,
+                flags: Default::default(),
             },
         );
         material_set.push(
@@ -96,6 +97,7 @@ impl Gfx {
                 roughness_texture: tex_white,
                 metallic_texture: tex_white,
                 ambient_occlusion_texture: tex_white,
+                flags: Default::default(),
             },
         );
         material_set.push(
@@ -109,8 +111,20 @@ impl Gfx {
                 roughness_texture: tex_white,
                 metallic_texture: tex_white,
                 ambient_occlusion_texture: tex_white,
+                flags: Default::default(),
             },
         );
+
+        material_set.push(
+            &mut render,
+            &PbrMaterial {
+                albedo: Vec4::new(0.3, 0.4, 1.0, 1.0),
+                albedo_texture: tex_white,
+                flags: *PbrFlags::default().set_unlighted(true),
+                ..Default::default()
+            },
+        );
+
         let camera = Camera::new(&mut render);
 
         let material_set = Shared::new(material_set);

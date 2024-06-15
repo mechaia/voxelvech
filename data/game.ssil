@@ -1,14 +1,16 @@
+##### MATH #####
+
 record Quat {
-	Float32 w
-	Float32 x
-	Float32 y
-	Float32 z
+	Fp32 w
+	Fp32 x
+	Fp32 y
+	Fp32 z
 }
 
 record Vec3 {
-	Float32 x
-	Float32 y
-	Float32 z
+	Fp32 x
+	Fp32 y
+	Fp32 z
 }
 
 record Transform {
@@ -16,39 +18,38 @@ record Transform {
 	Vec3 translation
 }
 
-alias.type game.ProjectileIndex = Natural12
-alias.type game.ProjectileCount = Natural_4096
-
-il.type game.Vehicle
-il.type game.Gltf
-
-function game.start() {
-	game.physics.init()
-	become start()
+constant Transform UNIT {
+	rotation = UNIT
+	translation = 0
 }
 
-il.function game.wait_step()
-il.function game.wait_draw()
-il.function game.graphics.draw()
-il.function game.graphics.load_gltf(ConstantString game.graphics.load_gltf.in) -> game.Gltf game.graphics.load_gltf.out
-il.function game.physics.init()
-il.function game.physics.step()
-il.function game.vehicle.load_v0(ConstantString game.vehicle.load.in) -> game.Vehicle game.vehicle.load.out
-il.function game.vehicle.step(ref game.Vehicle vehicle)
-il.function game.vehicle.draw(game.Vehicle vehicle)
+constant Transform 0 {
+	rotation = 0
+	translation = 0
+}
 
-function transform.new(Vec3 translation, Quat rotation) -> Transform {
+function transform_new(Vec3 translation, Quat rotation) -> Transform {
 	Transform t
 	t.rotation = rotation
 	t.translation = translation
 	return t
 }
 
-function transform.zero() -> Transform {
-	return transform.new(vec3.zero(), quat.zero())
+constant Quat UNIT {
+	w = 1
+	x = 0
+	y = 0
+	z = 0
 }
 
-function quat.new(Float32 w, Float32 x, Float32 y, Float32 z) -> Quat {
+constant Quat 0 {
+	w = 0
+	x = 0
+	y = 0
+	z = 0
+}
+
+function quat_new(Fp32 w, Fp32 x, Fp32 y, Fp32 z) -> Quat {
 	Quat q
 	q.w = w
 	q.x = x
@@ -57,15 +58,37 @@ function quat.new(Float32 w, Float32 x, Float32 y, Float32 z) -> Quat {
 	return q
 }
 
-function quat.unit() -> Quat {
-	return quat.new(1, 0, 0, 0)
+constant Vec3 0 {
+	x = 0
+	y = 0
+	z = 0
 }
 
-function quat.zero() -> Quat {
-	return quat.new(0, 0, 0, 0)
+constant Vec3 1 {
+	x = 1
+	y = 1
+	z = 1
 }
 
-function vec3.new(Float32 x, Float32 y, Float32 z) -> Vec3 {
+constant Vec3 X {
+	x = 1
+	y = 0
+	z = 0
+}
+
+constant Vec3 Y {
+	x = 0
+	y = 1
+	z = 0
+}
+
+constant Vec3 Z {
+	x = 0
+	y = 0
+	z = 1
+}
+
+function vec3_new(Fp32 x, Fp32 y, Fp32 z) -> Vec3 {
 	Vec3 v
 	v.x = x
 	v.y = y
@@ -73,38 +96,109 @@ function vec3.new(Float32 x, Float32 y, Float32 z) -> Vec3 {
 	return v
 }
 
-function vec3.zero() -> Vec3 {
-	return vec3.new(0, 0, 0)
+function vec3_element_mul(Vec3 a, Vec3 b) -> Vec3 {
+	return vec3_new(fp32_mul(a.x, b.x), fp32_mul(a.y, b.y), fp32_mul(a.z, b.z))
 }
 
-function vec3.one() -> Vec3 {
-	return vec3.new(1, 1, 1)
+function vec3_element_sum(Vec3 v) -> Fp32 {
+	return fp32_add(fp32_add(v.x, v.y), v.z)
 }
 
-function vec3.x() -> Vec3 {
-	return vec3.new(1, 0, 0)
+function vec3_length_squared(Vec3 v) -> Fp32 {
+	return vec3_element_sum(vec3_element_mul(v, v))
 }
 
-function vec3.y() -> Vec3 {
-	return vec3.new(0, 1, 0)
+function vec3_length(Vec3 v) -> Fp32 {
+	return fp32_sqrt(vec3_length_squared(v))
 }
 
-function vec3.z() -> Vec3 {
-	return vec3.new(0, 0, 1)
+il.function fp32_add "fp32.add" (Fp32 "fp32:0", Fp32 "fp32:1") -> Fp32 "fp32:0"
+il.function fp32_mul "fp32.mul" (Fp32 "fp32:0", Fp32 "fp32:1") -> Fp32 "fp32:0"
+il.function fp32_sqrt "fp32.sqrt" (Fp32 "fp32:0") -> Fp32 "fp32:0"
+il.function fp32_eq "fp32.eq" (Fp32 "fp32:0", Fp32 "fp32:1") -> Int1 "int1:0"
+il.function fp32_lt "fp32.lt" (Fp32 "fp32:0", Fp32 "fp32:1") -> Int1 "int1:0"
+il.function fp32_gt "fp32.gt" (Fp32 "fp32:0", Fp32 "fp32:1") -> Int1 "int1:0"
+
+il.function int32_add "int32.add" (Int32 "int32:0", Int32 "int32:1") -> Int32 "int32:0"
+il.function int32_inc "int32.inc" (Int32 "int32:0") -> Int32 "int32:0"
+il.function int32_eq "int32.eq" (Int32 "int32:0", Int32 "int32:1") -> Int1 "int1:0"
+il.function int32_ge "int32.ge" (Int32 "int32:0", Int32 "int32:1") -> Int1 "int1:0"
+
+il.function const_str_len "const_str.len" (ConstStr "const_str:0") -> Int32 "int32:0"
+il.function const_str_get "const_str.get" (ConstStr "const_str:0", Int32 "int32:0") -> Int8 "int8:0"
+
+
+##### GAME #####
+
+il.function game_wait "game.wait" () -> Int1 "int1:0"
+
+il.function game_arg "game.arg" ()
+function game_arg_const_str (ConstStr name) {
+	game_path_set_const_str(name)
+	become game_arg()
 }
 
-function vec3.element_mul(Vec3 a, Vec3 b) -> Vec3 {
-	return vec3.new(float32.mul(a.x, b.x), float32.mul(a.y, b.y), float32.mul(a.z, b.z))
+il.function game_gltf_load "game.gltf.load" () -> game_Gltf "game.gltf:0"
+function game_gltf_load_const_str(ConstStr path) -> game_Gltf {
+	game_path_set_const_str(path)
+	return game_gltf_load()
 }
 
-function vec3.element_sum(Vec3 v) -> Float32 {
-	return float32.add(float32.add(v.x, v.y), v.z)
+il.function game_graphics_add_mesh_set "game.graphics.meshset.add" (game_Gltf "game.gltf:0") -> game_MeshSet "game.meshset:0"
+
+il.function _game_graphics_draw_push_transform "game.graphics.draw.push_transform" (
+	Fp32 "fp32:0",
+	Fp32 "fp32:1",
+	Fp32 "fp32:2",
+	Fp32 "fp32:3",
+	Fp32 "fp32:4",
+	Fp32 "fp32:5",
+	Fp32 "fp32:6",
+	Fp32 "fp32:7",
+)
+function game_graphics_draw_push_transform(Transform trf, Fp32 scale) {
+	Quat q = trf.rotation
+	Vec3 t = trf.translation
+	_game_graphics_draw_push_transform(q.w, q.x, q.y, q.z, t.x, t.y, t.z, scale)
 }
 
-function vec3.length_squared(Vec3 v) -> Float32 {
-	return vec3.element_sum(vec3.element_mul(v, v))
+il.function game_graphics_draw_mesh "game.graphics.draw.mesh" (game_MeshSet "game.meshset:0", Int32 "int32:0", Int32 "int32:1")
+
+il.function game_vehicle_load_v0 "game.vehicle.load.v0" () -> game_Vehicle "game.vehicle:0"
+function game_vehicle_load_v0_const_str(ConstStr path) -> game_Vehicle {
+	game_path_set_const_str(path)
+	return game_vehicle_load_v0()
 }
 
-il.function float32.add(Float32 float32.in_0, Float32 float32.in_1) -> Float32 float32.out_0
-il.function float32.mul(Float32 float32.in_0, Float32 float32.in_1) -> Float32 float32.out_0
-il.function float32.eq(Float32 float32.in_0, Float32 float32.in_1) -> Boolean boolean.out_0
+il.function game_input_get "game.input.get" () -> Fp32 "fp32:0"
+function game_input_get_const_str(ConstStr name) -> Fp32 {
+	game_path_set_const_str(name)
+	return game_input_get()
+}
+
+il.function _game_physics_rigidbody_add "game.physics.rigidbody.add" (Int2 "int2:0") -> game_RigidBody "game.rigidbody:0"
+function game_physics_rigidbody_add_static() -> game_RigidBody {
+	return _game_physics_rigidbody_add(0)
+}
+function game_physics_rigidbody_add_dynamic() -> game_RigidBody {
+	return _game_physics_rigidbody_add(1)
+}
+
+il.function _game_physics_collider_add "game.physics.rigidbody.add" (game_RigidBody "game.rigidbody:0", Int4 "int4:0") -> game_Collider "game.collider:0"
+
+il.function game_path_push "game.path.push" (Int8 "int8:0")
+il.function game_path_len "game.path.len" () -> Int32 "int32:0"
+il.function game_path_get "game.path.get" (Int32 "int32:0") -> Int8 "int8:0"
+il.function game_path_clear "game.path.clear" ()
+function game_path_set_const_str(ConstStr str) {
+	Int32 i = 0
+	game_path_clear()
+	loop {
+		if int32_eq(const_str_len(str), i) {
+			return
+		}
+		Int8 c = const_str_get(str, i)
+		game_path_push(c)
+		i = int32_inc(i)
+	}
+}

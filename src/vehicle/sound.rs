@@ -2,7 +2,10 @@ use mechaia::{
     math::{FloatExt, IVec3, Vec3},
     sound::mix::wave,
     util::{
-        math::fixed::{U0d32, U32d32}, rand::Rng, soa::Vec2, Transform
+        math::fixed::{U0d32, U32d32},
+        rand::Rng,
+        soa::Vec2,
+        Transform,
     },
 };
 use std::{collections::HashMap, num::Wrapping, ops::RangeInclusive, time::Instant};
@@ -46,7 +49,6 @@ pub struct LaserSound {
 struct PingSound {
     volume: Volume,
     t: Wrapping<U0d32>,
-    attack: U0d32,
     hold: U0d32,
     frequency: u32,
     amplitude: f32,
@@ -69,7 +71,7 @@ impl VehicleSound {
     }
 
     pub fn next_samples(&mut self, receptor: &mut DualReceptor<'_>) {
-        for (&pos, wheel) in self.wheels.iter_mut() {
+        for (_, wheel) in self.wheels.iter_mut() {
             wheel.next_samples(receptor);
         }
     }
@@ -118,16 +120,11 @@ impl GlobalSound {
 
     pub fn add_sound_break(&mut self, pos: Vec3) {
         let mut rng = mechaia::util::rand::thread_rng();
-        for (r, v) in [4e2..=4.5e2, 5e2..=8e2, 1.5e3..=2e3].into_iter().zip([0.5, 0.3, 0.2]) {
+        for (r, v) in [4e2..=4.5e2, 5e2..=8e2, 1.5e3..=2e3]
+            .into_iter()
+            .zip([0.5, 0.3, 0.2])
+        {
             let t = gen_tone_freq(rng.gen(), U0d32::FRAC_1_4 / 32, rng.gen_range(r), v);
-            self.ping.push((pos, t));
-        }
-    }
-
-    pub fn add_sound_destroy(&mut self, pos: Vec3) {
-        let mut rng = mechaia::util::rand::thread_rng();
-        for (r, v) in [1e2..=2e2, 4e2..=4.5e2, 5e2..=8e2].into_iter().zip([1.5, 0.7, 0.5]) {
-            let mut t = gen_tone_freq(rng.gen(), U0d32::FRAC_1_4 / 16, rng.gen_range(r), v);
             self.ping.push((pos, t));
         }
     }
@@ -189,7 +186,6 @@ fn gen_tone_freq(t: U0d32, hold: U0d32, f: f32, amplitude: f32) -> PingSound {
     PingSound {
         volume: Default::default(), // FIXME
         t: Wrapping(t),
-        attack: Default::default(),
         hold,
         frequency: f as u32,
         amplitude,

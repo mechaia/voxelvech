@@ -128,7 +128,12 @@ impl Player {
             if let Some(q) = &dmg_query {
                 let mut acc = DamageAccumulator::default();
                 acc.add_heat(q.occupied.as_vec3(), Vec3::X, 260);
-                vehicle.apply_damage(physics, &mut sounds.player_vehicle, &mut sounds.all_vehicles, acc);
+                vehicle.apply_damage(
+                    physics,
+                    &mut sounds.player_vehicle,
+                    &mut sounds.all_vehicles,
+                    acc,
+                );
 
                 query = vehicle.query_ray(
                     physics,

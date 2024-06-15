@@ -1,0 +1,378 @@
+
+( Quat
+& w Fp32
+& x Fp32
+& y Fp32
+& z Fp32
+)
+
+( Vec3
+& x Fp32
+& y Fp32
+& z Fp32
+)
+
+( Transform
+& rotation Quat
+& translation Vec3
+)
+
+_ Transform UNIT
++ rotation UNIT
++ translation 0
+-
+
+_ Transform 0
++ rotation 0
++ translation 0
+-
+
+_ Quat UNIT
++ w 1
++ x 0
++ y 0
++ z 0
+-
+
+_ Quat 0
++ w 0
++ x 0
++ y 0
++ z 0
+-
+
+_ Vec3 0
++ x 0
++ y 0
++ z 0
+-
+
+_ Vec3 1
++ x 1
++ y 1
++ z 1
+-
+
+_ Vec3 X
++ x 1
++ y 0
++ z 0
+-
+
+_ Vec3 Y
++ x 0
++ y 1
++ z 0
+-
+
+_ Vec3 Z
++ x 0
++ y 0
++ z 1
+-
+
+$ assets game_Gltf
+$ mesh_set game_MeshSet
+$ player game_Vehicle
+$ projectile_mesh Int32
+$ projectile_material_player game_Material
+$ projectile_material_enemy game_Material
+@ enemies Int2 game_Vehicle
+
+> transform_new
+. transform_new:$1 transform_new:rotation
+( transform_new:$0 rotation transform_new:$1
+. transform_new:$2 transform_new:translation
+( transform_new:$0 translation transform_new:$2
+. transform_new:return transform_new:$0
+<
+$ transform_new:translation Vec3
+$ transform_new:rotation Quat
+$ transform_new:return Transform
+$ transform_new:$0 Transform
+$ transform_new:$1 Quat
+$ transform_new:$2 Vec3
+
+> quat_new
+. quat_new:$4 quat_new:w
+( quat_new:$3 w quat_new:$4
+. quat_new:$5 quat_new:x
+( quat_new:$3 x quat_new:$5
+. quat_new:$6 quat_new:y
+( quat_new:$3 y quat_new:$6
+. quat_new:$7 quat_new:z
+( quat_new:$3 z quat_new:$7
+. quat_new:return quat_new:$3
+<
+$ quat_new:w Fp32
+$ quat_new:x Fp32
+$ quat_new:y Fp32
+$ quat_new:z Fp32
+$ quat_new:return Quat
+$ quat_new:$3 Quat
+$ quat_new:$4 Fp32
+$ quat_new:$5 Fp32
+$ quat_new:$6 Fp32
+$ quat_new:$7 Fp32
+
+> vec3_new
+. vec3_new:$9 vec3_new:x
+( vec3_new:$8 x vec3_new:$9
+. vec3_new:$10 vec3_new:y
+( vec3_new:$8 y vec3_new:$10
+. vec3_new:$11 vec3_new:z
+( vec3_new:$8 z vec3_new:$11
+. vec3_new:return vec3_new:$8
+<
+$ vec3_new:x Fp32
+$ vec3_new:y Fp32
+$ vec3_new:z Fp32
+$ vec3_new:return Vec3
+$ vec3_new:$8 Vec3
+$ vec3_new:$9 Fp32
+$ vec3_new:$10 Fp32
+$ vec3_new:$11 Fp32
+
+> vec3_element_mul
+) vec3_element_mul:a x vec3_element_mul:$12
+. fp32:0 vec3_element_mul:$12
+) vec3_element_mul:b x vec3_element_mul:$13
+. fp32:1 vec3_element_mul:$13
+| fp32.mul
+. vec3_new:x fp32:0
+) vec3_element_mul:a y vec3_element_mul:$14
+. fp32:0 vec3_element_mul:$14
+) vec3_element_mul:b y vec3_element_mul:$15
+. fp32:1 vec3_element_mul:$15
+| fp32.mul
+. vec3_new:y fp32:0
+) vec3_element_mul:a z vec3_element_mul:$16
+. fp32:0 vec3_element_mul:$16
+) vec3_element_mul:b z vec3_element_mul:$17
+. fp32:1 vec3_element_mul:$17
+| fp32.mul
+. vec3_new:z fp32:0
+| vec3_new
+. vec3_element_mul:return vec3_new:return
+<
+$ vec3_element_mul:a Vec3
+$ vec3_element_mul:b Vec3
+$ vec3_element_mul:return Vec3
+$ vec3_element_mul:$12 Fp32
+$ vec3_element_mul:$13 Fp32
+$ vec3_element_mul:$14 Fp32
+$ vec3_element_mul:$15 Fp32
+$ vec3_element_mul:$16 Fp32
+$ vec3_element_mul:$17 Fp32
+
+> vec3_element_sum
+) vec3_element_sum:v x vec3_element_sum:$18
+. fp32:0 vec3_element_sum:$18
+) vec3_element_sum:v y vec3_element_sum:$19
+. fp32:1 vec3_element_sum:$19
+| fp32.add
+) vec3_element_sum:v z vec3_element_sum:$20
+. fp32:1 vec3_element_sum:$20
+| fp32.add
+. vec3_element_sum:return fp32:0
+<
+$ vec3_element_sum:v Vec3
+$ vec3_element_sum:return Fp32
+$ vec3_element_sum:$18 Fp32
+$ vec3_element_sum:$19 Fp32
+$ vec3_element_sum:$20 Fp32
+
+> vec3_length_squared
+. vec3_element_mul:a vec3_length_squared:v
+. vec3_element_mul:b vec3_length_squared:v
+| vec3_element_mul
+. vec3_element_sum:v vec3_element_mul:return
+| vec3_element_sum
+. vec3_length_squared:return vec3_element_sum:return
+<
+$ vec3_length_squared:v Vec3
+$ vec3_length_squared:return Fp32
+
+> vec3_length
+. vec3_length_squared:v vec3_length:v
+| vec3_length_squared
+. fp32:0 vec3_length_squared:return
+| fp32.sqrt
+. vec3_length:return fp32:0
+<
+$ vec3_length:v Vec3
+$ vec3_length:return Fp32
+
+> game_arg_const_str
+. game_path_set_const_str:str game_arg_const_str:name
+| game_path_set_const_str
+= game.arg
+$ game_arg_const_str:name ConstStr
+
+> game_gltf_load_const_str
+. game_path_set_const_str:str game_gltf_load_const_str:path
+| game_path_set_const_str
+| game.gltf.load
+. game_gltf_load_const_str:return game.gltf:0
+<
+$ game_gltf_load_const_str:path ConstStr
+$ game_gltf_load_const_str:return game_Gltf
+
+> game_graphics_draw_push_transform
+) game_graphics_draw_push_transform:trf rotation game_graphics_draw_push_transform:$22
+. game_graphics_draw_push_transform:$21 game_graphics_draw_push_transform:$22
+) game_graphics_draw_push_transform:trf translation game_graphics_draw_push_transform:$24
+. game_graphics_draw_push_transform:$23 game_graphics_draw_push_transform:$24
+) game_graphics_draw_push_transform:$21 w game_graphics_draw_push_transform:$25
+. fp32:0 game_graphics_draw_push_transform:$25
+) game_graphics_draw_push_transform:$21 x game_graphics_draw_push_transform:$26
+. fp32:1 game_graphics_draw_push_transform:$26
+) game_graphics_draw_push_transform:$21 y game_graphics_draw_push_transform:$27
+. fp32:2 game_graphics_draw_push_transform:$27
+) game_graphics_draw_push_transform:$21 z game_graphics_draw_push_transform:$28
+. fp32:3 game_graphics_draw_push_transform:$28
+) game_graphics_draw_push_transform:$23 x game_graphics_draw_push_transform:$29
+. fp32:4 game_graphics_draw_push_transform:$29
+) game_graphics_draw_push_transform:$23 y game_graphics_draw_push_transform:$30
+. fp32:5 game_graphics_draw_push_transform:$30
+) game_graphics_draw_push_transform:$23 z game_graphics_draw_push_transform:$31
+. fp32:6 game_graphics_draw_push_transform:$31
+. fp32:7 game_graphics_draw_push_transform:scale
+| game.graphics.draw.push_transform
+<
+$ game_graphics_draw_push_transform:trf Transform
+$ game_graphics_draw_push_transform:scale Fp32
+$ game_graphics_draw_push_transform:$21 Quat
+$ game_graphics_draw_push_transform:$22 Quat
+$ game_graphics_draw_push_transform:$23 Vec3
+$ game_graphics_draw_push_transform:$24 Vec3
+$ game_graphics_draw_push_transform:$25 Fp32
+$ game_graphics_draw_push_transform:$26 Fp32
+$ game_graphics_draw_push_transform:$27 Fp32
+$ game_graphics_draw_push_transform:$28 Fp32
+$ game_graphics_draw_push_transform:$29 Fp32
+$ game_graphics_draw_push_transform:$30 Fp32
+$ game_graphics_draw_push_transform:$31 Fp32
+
+> game_vehicle_load_v0_const_str
+. game_path_set_const_str:str game_vehicle_load_v0_const_str:path
+| game_path_set_const_str
+| game.vehicle.load.v0
+. game_vehicle_load_v0_const_str:return game.vehicle:0
+<
+$ game_vehicle_load_v0_const_str:path ConstStr
+$ game_vehicle_load_v0_const_str:return game_Vehicle
+
+> game_input_get_const_str
+. game_path_set_const_str:str game_input_get_const_str:name
+| game_path_set_const_str
+| game.input.get
+. game_input_get_const_str:return fp32:0
+<
+$ game_input_get_const_str:name ConstStr
+$ game_input_get_const_str:return Fp32
+
+> game_physics_rigidbody_add_static
++ int2:0 0
+| game.physics.rigidbody.add
+. game_physics_rigidbody_add_static:return game.rigidbody:0
+<
+$ game_physics_rigidbody_add_static:return game_RigidBody
+
+> game_physics_rigidbody_add_dynamic
++ int2:0 1
+| game.physics.rigidbody.add
+. game_physics_rigidbody_add_dynamic:return game.rigidbody:0
+<
+$ game_physics_rigidbody_add_dynamic:return game_RigidBody
+
+> game_path_set_const_str
++ game_path_set_const_str:$32 0
+| game.path.clear
+= game_path_set_const_str:loop.0
+> game_path_set_const_str:loop.0
+. const_str:0 game_path_set_const_str:str
+| const_str.len
+. int32:1 game_path_set_const_str:$32
+| int32.eq
+= game_path_set_const_str:loop.0:if.0.switch
+[ game_path_set_const_str:loop.0:if.0.switch int1:0
+? 0 game_path_set_const_str:loop.0.1
+! game_path_set_const_str:loop.0:if.0
+> game_path_set_const_str:loop.0:if.0
+<
+> game_path_set_const_str:loop.0.1
+. const_str:0 game_path_set_const_str:str
+. int32:0 game_path_set_const_str:$32
+| const_str.get
+. game_path_set_const_str:loop.0.1:$33 int8:0
+. int8:0 game_path_set_const_str:loop.0.1:$33
+| game.path.push
+. int32:0 game_path_set_const_str:$32
+| int32.inc
+. game_path_set_const_str:$32 int32:0
+= game_path_set_const_str:loop.0
+> game_path_set_const_str.2
+<
+$ game_path_set_const_str:str ConstStr
+$ game_path_set_const_str:$32 Int32
+$ game_path_set_const_str:loop.0.1:$33 Int8
+
+> start
++ game_gltf_load_const_str:path "data:map.glb"
+| game_gltf_load_const_str
+. assets game_gltf_load_const_str:return
+. game.gltf:0 assets
+| game.graphics.meshset.add
+. mesh_set game.meshset:0
++ game_arg_const_str:name "player_vehicle"
+| game_arg_const_str
+| game.vehicle.load.v0
+. player game.vehicle:0
++ game_vehicle_load_v0_const_str:path "data:a.vvt"
+| game_vehicle_load_v0_const_str
++ start:$34 0
+{ enemies start:$34 game_vehicle_load_v0_const_str:return
++ game_vehicle_load_v0_const_str:path "data:b.vvt"
+| game_vehicle_load_v0_const_str
++ start:$35 1
+{ enemies start:$35 game_vehicle_load_v0_const_str:return
++ game_vehicle_load_v0_const_str:path "data:c.vvt"
+| game_vehicle_load_v0_const_str
++ start:$36 2
+{ enemies start:$36 game_vehicle_load_v0_const_str:return
+= _loop
+$ start:$34 Int2
+$ start:$35 Int2
+$ start:$36 Int2
+
+> _loop
+| game.wait
+= _loop:if.0.switch
+[ _loop:if.0.switch int1:0
+? 0 _loop.1
+! _loop:if.0
+> _loop:if.0
+= draw
+> _loop.1
+= step
+
+> step
+= _loop
+
+> draw
++ vec3_new:x 5
++ vec3_new:y 2
++ vec3_new:z -1
+| vec3_new
+. transform_new:translation vec3_new:return
++ transform_new:rotation UNIT
+| transform_new
+. game_graphics_draw_push_transform:trf transform_new:return
+| game_graphics_draw_push_transform
+. game.meshset:0 mesh_set
++ int32:0 0
++ int32:1 0
+| game.graphics.draw.mesh
+= _loop
+
