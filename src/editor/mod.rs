@@ -319,12 +319,10 @@ impl Editor {
             }
             Ui::Save(picker) => {
                 // TODO how do we handle *new* files?
-                todo!();
-                /*
-                if let Some(item) = picker.handle_input(state) {
+                if let Some(p) = picker.handle_input(state) {
                     if !p.ends_with(".vvt") {
                         // avoid surprised, complete with extension and retry
-                        state.gui.data.file_picker.input_extend(".vvt".chars());
+                        picker.filter_extend(".vvt".chars());
                     } else {
                         let f = std::fs::OpenOptions::new()
                             .write(true)
@@ -333,10 +331,13 @@ impl Editor {
                             .open(p);
                         match f {
                             Ok(mut f) => {
-                                match vehicle.save_v0_text(&block_set, &mut |b| f.write_all(b)) {
+                                match self
+                                    .player_vehicle
+                                    .save_v0_text(&state.block_set, &mut |b| f.write_all(b))
+                                {
                                     Ok(()) => {
                                         log::success(format!("saved vehicle to '{p}'"));
-                                        state.gui.data.show = None;
+                                        self.ui = Ui::Nothing;
                                         self.autosaver.deadline = None;
                                     }
                                     Err(e) => {
@@ -350,7 +351,6 @@ impl Editor {
                         };
                     }
                 }
-                */
             }
             Ui::Spawn(picker) => {
                 if let Some(item) = picker.handle_input(state) {
@@ -613,10 +613,9 @@ impl Scenario for Editor {
         crate::gui::draw_logbox(draw);
         match &self.ui {
             Ui::Nothing => gui::draw_crosshair(draw),
-            Ui::Menu(p) | Ui::Load(p) | Ui::Spawn(p) | Ui::Scenario(p) => {
+            Ui::Menu(p) | Ui::Load(p) | Ui::Spawn(p) | Ui::Scenario(p) | Ui::Save(p) => {
                 p.render(draw.viewport_rect(), draw)
             }
-            Ui::Save(_) => todo!(),
         }
     }
 

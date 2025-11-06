@@ -222,20 +222,18 @@ impl Vehicle {
         self.physics.set_transform(physics, transform)
     }
 
-    pub fn set_input(
-        &mut self,
-        state: &crate::State,
-        physics: &Physics,
-        name: &str,
-        value: f32,
-    ) {
+    pub fn set_input(&mut self, state: &crate::State, physics: &Physics, name: &str, value: f32) {
         let com = self.physics.center_of_mass(physics);
         let value = value.clamp(-1.0, 1.0);
         match name {
             "steer" => {
                 let wheel_max_angle = core::f32::consts::FRAC_PI_6;
                 for (&pos, w) in self.physics.pos_to_wheel.iter() {
-                    let value = if (pos.x as f32) < com.x { -value } else { value };
+                    let value = if (pos.x as f32) < com.x {
+                        -value
+                    } else {
+                        value
+                    };
                     self.physics
                         .vehicle_body
                         .set_wheel_angle(w.handle, value * wheel_max_angle);

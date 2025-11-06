@@ -78,6 +78,13 @@ impl ItemPicker {
             .unwrap_or(self.items.len().saturating_sub(1));
     }
 
+    pub fn filter_extend<I>(&mut self, iter: I)
+    where
+        I: IntoIterator<Item = char>,
+    {
+        self.filter.extend(iter);
+    }
+
     fn advance(&mut self, f: impl Fn(&mut Self)) {
         let i = self.selected;
         loop {

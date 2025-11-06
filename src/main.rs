@@ -208,12 +208,12 @@ fn main() {
 
         (scenario, sound_data.lock().unwrap().f) = match args.next().as_deref() {
             Some("scenario") => {
-				todo!();
-/*
-                let script = args.next().unwrap();
-                let (a, b) = scenario::pil::PilScenario::new(&script, &mut state, &mut gfx);
-                (Box::new(a) as Box<dyn Scenario>, b)
-*/
+                todo!();
+                /*
+                                let script = args.next().unwrap();
+                                let (a, b) = scenario::pil::PilScenario::new(&script, &mut state, &mut gfx);
+                                (Box::new(a) as Box<dyn Scenario>, b)
+                */
             }
             Some(s) => todo!("{s:?}"),
             None => {
