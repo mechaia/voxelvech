@@ -1,25 +1,37 @@
 include "../../game.ssil"
 
-register game_Gltf assets
+register game_Collection assets
 register game_MeshSet mesh_set
 
 register game_Vehicle player
 register [Int2 -> game_Vehicle] enemies
 
-register Int32 projectile_mesh
-register game_Material projectile_material_player
-register game_Material projectile_material_enemy
+register game_RigidBody surface
+register game_RigidBody cube
 
 function start() {
-	assets = game_gltf_load_const_str("data:map.glb")
+	assets = game_gltf_load_const_str("self:map.glb")
 	mesh_set = game_graphics_add_mesh_set(assets)
 
-	game_arg_const_str("player_vehicle")
-	player = game_vehicle_load_v0()
+	game_arg_path_const_str("player_vehicle")
+	player = game_vehicle_load_path(0)
+	game_vehicle_set_transform(player, transform_new(vec3_new(7, 0, 0), IDENTITY))
 
-	enemies[0] = game_vehicle_load_v0_const_str("data:a.vvt")
-	enemies[1] = game_vehicle_load_v0_const_str("data:b.vvt")
-	enemies[2] = game_vehicle_load_v0_const_str("data:c.vvt")
+	spawn_enemy("self:a.vvt", 1, 100, 30, 0)
+	#enemies[2] = game_vehicle_load_v0_const_str("self:b.vvt", 2)
+	#enemies[3] = game_vehicle_load_v0_const_str("self:c.vvt", 3)
+
+	game_Shape shape
+
+	surface = game_physics_rigidbody_add_fixed()
+	shape = game_physics_shape_make_halfspace(Z)
+	game_physics_collider_add(surface, shape, transform_new(vec3_new(0, 0, -5), IDENTITY), 0.8, 0.2, 7)
+
+	cube = game_physics_rigidbody_add_dynamic()
+	shape = game_physics_shape_make_cuboid(1)
+	game_physics_collider_add(cube, shape, IDENTITY, 0.8, 0.0, 1337)
+
+	game_physics_rigidbody_set_transform(cube, transform_new(vec3_new(5, 2, 10), IDENTITY))
 
 	become _loop()
 }
@@ -36,7 +48,18 @@ function step() {
 }
 
 function draw() {
-	game_graphics_draw_push_transform(transform_new(vec3_new(5, 2, -1), UNIT))
+	Transform t = game_physics_rigidbody_get_transform(cube)
+	game_graphics_draw_push_transform(t, 1)
 	game_graphics_draw_mesh(mesh_set, 0, 0)
 	become _loop()
+}
+
+function spawn_enemy(ConstStr path, Int2 id, Fp32 x, Fp32 y, Fp32 z) {
+	game_Vehicle v = game_vehicle_load_const_str(path, int2_to_32(id))
+	game_vehicle_set_transform(v, transform_new(vec3_new(x, y, z), IDENTITY))
+	game_script_args_clear()
+	game_script_args_push_const_str__vehicle("vehicle", v)
+	game_script_args_push_const_str__vehicle("target", player)
+	game_script_launch_const_str("self:ai.pil")
+	enemies[id] = v
 }

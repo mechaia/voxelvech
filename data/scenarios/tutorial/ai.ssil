@@ -1,0 +1,49 @@
+include "../../game.ssil"
+
+register game_Vehicle vehicle
+register game_Vehicle target
+
+function start() {
+	vehicle = game_arg_vehicle_const_str("vehicle")
+	target = game_arg_vehicle_const_str("target")
+	become _loop()
+}
+
+function _loop() {
+	game_wait()
+	
+	Transform t
+
+	Transform t0 = game_vehicle_get_transform(vehicle)
+	Vec3 forward = quat_mul_vec3(t0.rotation, X)
+	Vec3 right = quat_mul_vec3(t0.rotation, Y)
+	Vec3 up = quat_mul_vec3(t0.rotation, Z)
+
+	Transform t1 = game_vehicle_get_transform(target)
+	Vec3 rel_pos = vec3_sub(t1.translation, t0.translation)
+	Vec3 rel_dir = vec3_normalize(rel_pos)
+
+	Fp32 direction_2 = vec3_dot(vec3_cross(forward, rel_dir), up)
+	Fp32 direction_1 = vec3_dot(vec3_cross(right, rel_dir), up)
+
+	Fp32 distance = vec3_length(rel_pos)
+
+
+	Fp32 steer
+	if fp32_gt(direction_1, 0) {
+		steer = 1
+	} else {
+		steer = fp32_mul(direction_2, 10)
+	}
+	game_vehicle_set_input_const_str(vehicle, "steer", steer)
+
+	Fp32 forward = fp32_max(fp32_div(fp32_sub(distance, 32), 128), 0)
+	game_debug_fp32("forward", forward)
+	game_debug_fp32("X", fp32_min(5, 3))
+	game_debug_fp32("X", fp32_min(3, 5))
+	game_debug_fp32("X", fp32_max(5, 3))
+	game_debug_fp32("X", fp32_max(13, 15))
+	game_vehicle_set_input_const_str(vehicle, "forward", forward)
+
+	become _loop()
+}

@@ -1,83 +1,234 @@
+# Enums:
+# Records:
+#   Transform <__main__.Record object at 0x7ffff73f8e10>
+#   Quat <__main__.Record object at 0x7ffff73f8f90>
+#   Vec3 <__main__.Record object at 0x7ffff73f9250>
+# Constants:
+#   Transform 0
+#     (il)
+#   Transform IDENTITY
+#     (il)
+#   Quat 0
+#     (il)
+#   Quat IDENTITY
+#     (il)
+#   Vec3 0
+#     (il)
+#   Vec3 1
+#     (il)
+#   Vec3 X
+#     (il)
+#   Vec3 Y
+#     (il)
+#   Vec3 Z
+#     (il)
+# Registers:
+#   game_Collection assets
+#   game_MeshSet mesh_set
+#   game_Vehicle player
+#   [Int2 -> game_Vehicle] enemies
+#   game_RigidBody surface
+#   game_RigidBody cube
+# Functions:
+#   transform_new
+#     Transform <__main__.AssignUnit object at 0x7ffff759c090>
+#     <__main__.AssignUnit object at 0x7ffff73f9c10> = <rotation>
+#     <__main__.AssignUnit object at 0x7ffff73f9dd0> = <translation>
+#     return <t>
+#   quat_new
+#     Quat <__main__.AssignUnit object at 0x7ffff73fa250>
+#     <__main__.AssignUnit object at 0x7ffff73fa450> = <x>
+#     <__main__.AssignUnit object at 0x7ffff73fa590> = <y>
+#     <__main__.AssignUnit object at 0x7ffff73fa6d0> = <z>
+#     <__main__.AssignUnit object at 0x7ffff73fa850> = <w>
+#     return <q>
+#   vec3_new
+#     Vec3 <__main__.AssignUnit object at 0x7ffff73fad90>
+#     <__main__.AssignUnit object at 0x7ffff73fb010> = <x>
+#     <__main__.AssignUnit object at 0x7ffff73fb190> = <y>
+#     <__main__.AssignUnit object at 0x7ffff73fb390> = <z>
+#     return <v>
+#   fp32_add
+#      (il.function)
+#   fp32_sub
+#      (il.function)
+#   fp32_mul
+#      (il.function)
+#   fp32_div
+#      (il.function)
+#   fp32_min
+#      (il.function)
+#   fp32_max
+#      (il.function)
+#   fp32_sqrt
+#      (il.function)
+#   fp32_eq
+#      (il.function)
+#   fp32_lt
+#      (il.function)
+#   fp32_gt
+#      (il.function)
+#   int32_add
+#      (il.function)
+#   int32_inc
+#      (il.function)
+#   int32_eq
+#      (il.function)
+#   int32_ge
+#      (il.function)
+#   int2_to_32
+#      (il.function)
+#   const_str_len
+#      (il.function)
+#   const_str_get
+#      (il.function)
+#   vec3_add
+#      (il.function)
+#   vec3_sub
+#      (il.function)
+#   vec3_mul
+#      (il.function)
+#   vec3_dot
+#      (il.function)
+#   vec3_cross
+#      (il.function)
+#   vec3_mul_fp32
+#      (il.function)
+#   vec3_normalize
+#      (il.function)
+#   vec3_length
+#      (il.function)
+#   vec3_length_squared
+#      (il.function)
+#   vec3_element_sum
+#      (il.function)
+#   vec3_element_mul
+#      (il.function)
+#   quat_mul_vec3
+#      (il.function)
+#   game_wait
+#      (il.function)
+#   game_arg_int32_path
+#      (il.function)
+#   game_arg_fp32_path
+#      (il.function)
+#   game_arg_path_path
+#      (il.function)
+#   game_arg_vehicle_path
+#      (il.function)
+#   game_arg_int32_const_str
+#      (il.function)
+#   game_arg_fp32_const_str
+#      (il.function)
+#   game_arg_path_const_str
+#      (il.function)
+#   game_arg_vehicle_const_str
+#      (il.function)
+#   game_gltf_load
+#      (il.function)
+#   game_gltf_load_const_str
+#     <game_path_set_const_str>(<path>)
+#     return <game_gltf_load>()
+#   game_graphics_add_mesh_set
+#      (il.function)
+#   game_graphics_draw_push_transform
+#      (il.function)
+#   game_graphics_draw_mesh
+#      (il.function)
+#   game_vehicle_load_path
+#      (il.function)
+#   game_vehicle_load_const_str
+#     <game_path_set_const_str>(<path>)
+#     return <game_vehicle_load_path>(<user_data>)
+#   game_vehicle_get_transform
+#      (il.function)
+#   game_vehicle_set_transform
+#      (il.function)
+#   game_vehicle_set_input_const_str
+#      (il.function)
+#   game_input_get_path
+#      (il.function)
+#   game_input_get_const_str
+#      (il.function)
+#   game_physics_rigidbody_add_fixed
+#      (il.function)
+#   game_physics_rigidbody_add_dynamic
+#      (il.function)
+#   game_physics_rigidbody_get_transform
+#      (il.function)
+#   game_physics_rigidbody_set_transform
+#      (il.function)
+#   game_physics_shape_make_compound_push
+#      (il.function)
+#   game_physics_shape_make_compound
+#      (il.function)
+#   game_physics_shape_make_cuboid
+#      (il.function)
+#   game_physics_shape_make_halfspace
+#      (il.function)
+#   game_physics_collider_add
+#      (il.function)
+#   game_path_push
+#      (il.function)
+#   game_path_len
+#      (il.function)
+#   game_path_get
+#      (il.function)
+#   game_path_clear
+#      (il.function)
+#   game_path_set_const_str
+#      (il.function)
+#   game_script_args_clear
+#      (il.function)
+#   game_script_args_push_const_str__vehicle
+#      (il.function)
+#   game_script_launch_const_str
+#      (il.function)
+#   game_debug_fp32
+#      (il.function)
+#   start
+#     <__main__.AssignUnit object at 0x7ffff7211310> = <game_gltf_load_const_str>(TokenStr['self:map.glb'])
+#     <__main__.AssignUnit object at 0x7ffff7211550> = <game_graphics_add_mesh_set>(<assets>)
+#     <game_arg_path_const_str>(TokenStr['player_vehicle'])
+#     <__main__.AssignUnit object at 0x7ffff7211ad0> = <game_vehicle_load_path>(<0>)
+#     <game_vehicle_set_transform>(<player>, <transform_new>(<vec3_new>(<7>, <0>, <0>), <IDENTITY>))
+#     <spawn_enemy>(TokenStr['self:a.vvt'], <1>, <100>, <30>, <0>)
+#     game_Shape <__main__.AssignUnit object at 0x7ffff7212b50>
+#     <__main__.AssignUnit object at 0x7ffff7212d50> = <game_physics_rigidbody_add_fixed>()
+#     <__main__.AssignUnit object at 0x7ffff7212e90> = <game_physics_shape_make_halfspace>(<Z>)
+#     <game_physics_collider_add>(<surface>, <shape>, <transform_new>(<vec3_new>(<0>, <0>, <-5>), <IDENTITY>), <0.8>, <0.2>, <7>)
+#     <__main__.AssignUnit object at 0x7ffff7213dd0> = <game_physics_rigidbody_add_dynamic>()
+#     <__main__.AssignUnit object at 0x7ffff721c050> = <game_physics_shape_make_cuboid>(<1>)
+#     <game_physics_collider_add>(<cube>, <shape>, <IDENTITY>, <0.8>, <0.0>, <1337>)
+#     <game_physics_rigidbody_set_transform>(<cube>, <transform_new>(<vec3_new>(<5>, <2>, <10>), <IDENTITY>))
+#     become <_loop>()
+#   _loop
+#     if
+#       become <draw>()
+#     else
+#     become <step>()
+#   step
+#     become <_loop>()
+#   draw
+#     Transform <__main__.AssignUnit object at 0x7ffff721ded0> = <game_physics_rigidbody_get_transform>(<cube>)
+#     <game_graphics_draw_push_transform>(<t>, <1>)
+#     <game_graphics_draw_mesh>(<mesh_set>, <0>, <0>)
+#     become <_loop>()
+#   spawn_enemy
+#     game_Vehicle <__main__.AssignUnit object at 0x7ffff721ee50> = <game_vehicle_load_const_str>(<path>, <int2_to_32>(<id>))
+#     <game_vehicle_set_transform>(<v>, <transform_new>(<vec3_new>(<x>, <y>, <z>), <IDENTITY>))
+#     <game_script_args_clear>()
+#     <game_script_args_push_const_str__vehicle>(TokenStr['vehicle'], <v>)
+#     <game_script_args_push_const_str__vehicle>(TokenStr['target'], <player>)
+#     <game_script_launch_const_str>(TokenStr['self:ai.pil'])
+#     <__main__.AssignArray object at 0x7ffff72204d0> = <v>
 
-( Quat
-& w Fp32
-& x Fp32
-& y Fp32
-& z Fp32
-)
-
-( Vec3
-& x Fp32
-& y Fp32
-& z Fp32
-)
-
-( Transform
-& rotation Quat
-& translation Vec3
-)
-
-_ Transform UNIT
-+ rotation UNIT
-+ translation 0
--
-
-_ Transform 0
-+ rotation 0
-+ translation 0
--
-
-_ Quat UNIT
-+ w 1
-+ x 0
-+ y 0
-+ z 0
--
-
-_ Quat 0
-+ w 0
-+ x 0
-+ y 0
-+ z 0
--
-
-_ Vec3 0
-+ x 0
-+ y 0
-+ z 0
--
-
-_ Vec3 1
-+ x 1
-+ y 1
-+ z 1
--
-
-_ Vec3 X
-+ x 1
-+ y 0
-+ z 0
--
-
-_ Vec3 Y
-+ x 0
-+ y 1
-+ z 0
--
-
-_ Vec3 Z
-+ x 0
-+ y 0
-+ z 1
--
-
-$ assets game_Gltf
-$ mesh_set game_MeshSet
-$ player game_Vehicle
-$ projectile_mesh Int32
-$ projectile_material_player game_Material
-$ projectile_material_enemy game_Material
-@ enemies Int2 game_Vehicle
+$ assets game.Collection
+$ mesh_set game.MeshSet
+$ player game.Vehicle
+$ surface game.RigidBody
+$ cube game.RigidBody
+@ enemies Int2 game.Vehicle
 
 > transform_new
 . transform_new:$1 transform_new:rotation
@@ -94,20 +245,20 @@ $ transform_new:$1 Quat
 $ transform_new:$2 Vec3
 
 > quat_new
-. quat_new:$4 quat_new:w
-( quat_new:$3 w quat_new:$4
-. quat_new:$5 quat_new:x
-( quat_new:$3 x quat_new:$5
-. quat_new:$6 quat_new:y
-( quat_new:$3 y quat_new:$6
-. quat_new:$7 quat_new:z
-( quat_new:$3 z quat_new:$7
+. quat_new:$4 quat_new:x
+( quat_new:$3 x quat_new:$4
+. quat_new:$5 quat_new:y
+( quat_new:$3 y quat_new:$5
+. quat_new:$6 quat_new:z
+( quat_new:$3 z quat_new:$6
+. quat_new:$7 quat_new:w
+( quat_new:$3 w quat_new:$7
 . quat_new:return quat_new:$3
 <
-$ quat_new:w Fp32
 $ quat_new:x Fp32
 $ quat_new:y Fp32
 $ quat_new:z Fp32
+$ quat_new:w Fp32
 $ quat_new:return Quat
 $ quat_new:$3 Quat
 $ quat_new:$4 Fp32
@@ -133,227 +284,156 @@ $ vec3_new:$9 Fp32
 $ vec3_new:$10 Fp32
 $ vec3_new:$11 Fp32
 
-> vec3_element_mul
-) vec3_element_mul:a x vec3_element_mul:$12
-. fp32:0 vec3_element_mul:$12
-) vec3_element_mul:b x vec3_element_mul:$13
-. fp32:1 vec3_element_mul:$13
-| fp32.mul
-. vec3_new:x fp32:0
-) vec3_element_mul:a y vec3_element_mul:$14
-. fp32:0 vec3_element_mul:$14
-) vec3_element_mul:b y vec3_element_mul:$15
-. fp32:1 vec3_element_mul:$15
-| fp32.mul
-. vec3_new:y fp32:0
-) vec3_element_mul:a z vec3_element_mul:$16
-. fp32:0 vec3_element_mul:$16
-) vec3_element_mul:b z vec3_element_mul:$17
-. fp32:1 vec3_element_mul:$17
-| fp32.mul
-. vec3_new:z fp32:0
-| vec3_new
-. vec3_element_mul:return vec3_new:return
-<
-$ vec3_element_mul:a Vec3
-$ vec3_element_mul:b Vec3
-$ vec3_element_mul:return Vec3
-$ vec3_element_mul:$12 Fp32
-$ vec3_element_mul:$13 Fp32
-$ vec3_element_mul:$14 Fp32
-$ vec3_element_mul:$15 Fp32
-$ vec3_element_mul:$16 Fp32
-$ vec3_element_mul:$17 Fp32
-
-> vec3_element_sum
-) vec3_element_sum:v x vec3_element_sum:$18
-. fp32:0 vec3_element_sum:$18
-) vec3_element_sum:v y vec3_element_sum:$19
-. fp32:1 vec3_element_sum:$19
-| fp32.add
-) vec3_element_sum:v z vec3_element_sum:$20
-. fp32:1 vec3_element_sum:$20
-| fp32.add
-. vec3_element_sum:return fp32:0
-<
-$ vec3_element_sum:v Vec3
-$ vec3_element_sum:return Fp32
-$ vec3_element_sum:$18 Fp32
-$ vec3_element_sum:$19 Fp32
-$ vec3_element_sum:$20 Fp32
-
-> vec3_length_squared
-. vec3_element_mul:a vec3_length_squared:v
-. vec3_element_mul:b vec3_length_squared:v
-| vec3_element_mul
-. vec3_element_sum:v vec3_element_mul:return
-| vec3_element_sum
-. vec3_length_squared:return vec3_element_sum:return
-<
-$ vec3_length_squared:v Vec3
-$ vec3_length_squared:return Fp32
-
-> vec3_length
-. vec3_length_squared:v vec3_length:v
-| vec3_length_squared
-. fp32:0 vec3_length_squared:return
-| fp32.sqrt
-. vec3_length:return fp32:0
-<
-$ vec3_length:v Vec3
-$ vec3_length:return Fp32
-
-> game_arg_const_str
-. game_path_set_const_str:str game_arg_const_str:name
-| game_path_set_const_str
-= game.arg
-$ game_arg_const_str:name ConstStr
-
 > game_gltf_load_const_str
-. game_path_set_const_str:str game_gltf_load_const_str:path
-| game_path_set_const_str
+. game_gltf_load_const_str:$12 game_gltf_load_const_str:path
+. const_str:0 game_gltf_load_const_str:$12
+| game.path.set.const_str
 | game.gltf.load
-. game_gltf_load_const_str:return game.gltf:0
+. game_gltf_load_const_str:return game.collection:0
 <
 $ game_gltf_load_const_str:path ConstStr
-$ game_gltf_load_const_str:return game_Gltf
+$ game_gltf_load_const_str:return game.Collection
+$ game_gltf_load_const_str:$12 ConstStr
 
-> game_graphics_draw_push_transform
-) game_graphics_draw_push_transform:trf rotation game_graphics_draw_push_transform:$22
-. game_graphics_draw_push_transform:$21 game_graphics_draw_push_transform:$22
-) game_graphics_draw_push_transform:trf translation game_graphics_draw_push_transform:$24
-. game_graphics_draw_push_transform:$23 game_graphics_draw_push_transform:$24
-) game_graphics_draw_push_transform:$21 w game_graphics_draw_push_transform:$25
-. fp32:0 game_graphics_draw_push_transform:$25
-) game_graphics_draw_push_transform:$21 x game_graphics_draw_push_transform:$26
-. fp32:1 game_graphics_draw_push_transform:$26
-) game_graphics_draw_push_transform:$21 y game_graphics_draw_push_transform:$27
-. fp32:2 game_graphics_draw_push_transform:$27
-) game_graphics_draw_push_transform:$21 z game_graphics_draw_push_transform:$28
-. fp32:3 game_graphics_draw_push_transform:$28
-) game_graphics_draw_push_transform:$23 x game_graphics_draw_push_transform:$29
-. fp32:4 game_graphics_draw_push_transform:$29
-) game_graphics_draw_push_transform:$23 y game_graphics_draw_push_transform:$30
-. fp32:5 game_graphics_draw_push_transform:$30
-) game_graphics_draw_push_transform:$23 z game_graphics_draw_push_transform:$31
-. fp32:6 game_graphics_draw_push_transform:$31
-. fp32:7 game_graphics_draw_push_transform:scale
-| game.graphics.draw.push_transform
+> game_vehicle_load_const_str
+. game_vehicle_load_const_str:$13 game_vehicle_load_const_str:path
+. const_str:0 game_vehicle_load_const_str:$13
+| game.path.set.const_str
+. game_vehicle_load_const_str:$14 game_vehicle_load_const_str:user_data
+. int32:0 game_vehicle_load_const_str:$14
+| game.vehicle.load.path
+. game_vehicle_load_const_str:return game.vehicle:0
 <
-$ game_graphics_draw_push_transform:trf Transform
-$ game_graphics_draw_push_transform:scale Fp32
-$ game_graphics_draw_push_transform:$21 Quat
-$ game_graphics_draw_push_transform:$22 Quat
-$ game_graphics_draw_push_transform:$23 Vec3
-$ game_graphics_draw_push_transform:$24 Vec3
-$ game_graphics_draw_push_transform:$25 Fp32
-$ game_graphics_draw_push_transform:$26 Fp32
-$ game_graphics_draw_push_transform:$27 Fp32
-$ game_graphics_draw_push_transform:$28 Fp32
-$ game_graphics_draw_push_transform:$29 Fp32
-$ game_graphics_draw_push_transform:$30 Fp32
-$ game_graphics_draw_push_transform:$31 Fp32
-
-> game_vehicle_load_v0_const_str
-. game_path_set_const_str:str game_vehicle_load_v0_const_str:path
-| game_path_set_const_str
-| game.vehicle.load.v0
-. game_vehicle_load_v0_const_str:return game.vehicle:0
-<
-$ game_vehicle_load_v0_const_str:path ConstStr
-$ game_vehicle_load_v0_const_str:return game_Vehicle
-
-> game_input_get_const_str
-. game_path_set_const_str:str game_input_get_const_str:name
-| game_path_set_const_str
-| game.input.get
-. game_input_get_const_str:return fp32:0
-<
-$ game_input_get_const_str:name ConstStr
-$ game_input_get_const_str:return Fp32
-
-> game_physics_rigidbody_add_static
-+ int2:0 0
-| game.physics.rigidbody.add
-. game_physics_rigidbody_add_static:return game.rigidbody:0
-<
-$ game_physics_rigidbody_add_static:return game_RigidBody
-
-> game_physics_rigidbody_add_dynamic
-+ int2:0 1
-| game.physics.rigidbody.add
-. game_physics_rigidbody_add_dynamic:return game.rigidbody:0
-<
-$ game_physics_rigidbody_add_dynamic:return game_RigidBody
-
-> game_path_set_const_str
-+ game_path_set_const_str:$32 0
-| game.path.clear
-= game_path_set_const_str:loop.0
-> game_path_set_const_str:loop.0
-. const_str:0 game_path_set_const_str:str
-| const_str.len
-. int32:1 game_path_set_const_str:$32
-| int32.eq
-= game_path_set_const_str:loop.0:if.0.switch
-[ game_path_set_const_str:loop.0:if.0.switch int1:0
-? 0 game_path_set_const_str:loop.0.1
-! game_path_set_const_str:loop.0:if.0
-> game_path_set_const_str:loop.0:if.0
-<
-> game_path_set_const_str:loop.0.1
-. const_str:0 game_path_set_const_str:str
-. int32:0 game_path_set_const_str:$32
-| const_str.get
-. game_path_set_const_str:loop.0.1:$33 int8:0
-. int8:0 game_path_set_const_str:loop.0.1:$33
-| game.path.push
-. int32:0 game_path_set_const_str:$32
-| int32.inc
-. game_path_set_const_str:$32 int32:0
-= game_path_set_const_str:loop.0
-> game_path_set_const_str.2
-<
-$ game_path_set_const_str:str ConstStr
-$ game_path_set_const_str:$32 Int32
-$ game_path_set_const_str:loop.0.1:$33 Int8
+$ game_vehicle_load_const_str:path ConstStr
+$ game_vehicle_load_const_str:user_data Int32
+$ game_vehicle_load_const_str:return game.Vehicle
+$ game_vehicle_load_const_str:$13 ConstStr
+$ game_vehicle_load_const_str:$14 Int32
 
 > start
-+ game_gltf_load_const_str:path "data:map.glb"
++ game_gltf_load_const_str:path "self:map.glb"
 | game_gltf_load_const_str
 . assets game_gltf_load_const_str:return
-. game.gltf:0 assets
+. start:$15 assets
+. game.collection:0 start:$15
 | game.graphics.meshset.add
 . mesh_set game.meshset:0
-+ game_arg_const_str:name "player_vehicle"
-| game_arg_const_str
-| game.vehicle.load.v0
++ start:$16 "player_vehicle"
+. const_str:0 start:$16
+| game.arg.path.const_str
++ start:$17 0
+. int32:0 start:$17
+| game.vehicle.load.path
 . player game.vehicle:0
-+ game_vehicle_load_v0_const_str:path "data:a.vvt"
-| game_vehicle_load_v0_const_str
-+ start:$34 0
-{ enemies start:$34 game_vehicle_load_v0_const_str:return
-+ game_vehicle_load_v0_const_str:path "data:b.vvt"
-| game_vehicle_load_v0_const_str
-+ start:$35 1
-{ enemies start:$35 game_vehicle_load_v0_const_str:return
-+ game_vehicle_load_v0_const_str:path "data:c.vvt"
-| game_vehicle_load_v0_const_str
-+ start:$36 2
-{ enemies start:$36 game_vehicle_load_v0_const_str:return
+. start:$18 player
++ vec3_new:x 7
++ vec3_new:y 0
++ vec3_new:z 0
+| vec3_new
+. transform_new:translation vec3_new:return
++ transform_new:rotation IDENTITY
+| transform_new
+. start:$19 transform_new:return
+. game.vehicle:0 start:$18
+. transform:0 start:$19
+| game.vehicle.set.transform
++ spawn_enemy:path "self:a.vvt"
++ spawn_enemy:id 1
++ spawn_enemy:x 100
++ spawn_enemy:y 30
++ spawn_enemy:z 0
+| spawn_enemy
+| game.physics.rigidbody.add.fixed
+. surface game.rigidbody:0
++ start:$21 Z
+. vec3:0 start:$21
+| game.physics.shape.make.halfspace
+. start:$20 game.shape:0
+. start:$22 surface
+. start:$23 start:$20
++ vec3_new:x 0
++ vec3_new:y 0
++ vec3_new:z -5
+| vec3_new
+. transform_new:translation vec3_new:return
++ transform_new:rotation IDENTITY
+| transform_new
+. start:$24 transform_new:return
++ start:$25 0.8
++ start:$26 0.2
++ start:$27 7
+. game.rigidbody:0 start:$22
+. game.shape:0 start:$23
+. transform:0 start:$24
+. fp32:0 start:$25
+. fp32:1 start:$26
+. int32:0 start:$27
+| game.physics.collider.add
+| game.physics.rigidbody.add.dynamic
+. cube game.rigidbody:0
++ start:$28 1
+. vec3:0 start:$28
+| game.physics.shape.make.cuboid
+. start:$20 game.shape:0
+. start:$29 cube
+. start:$30 start:$20
++ start:$31 IDENTITY
++ start:$32 0.8
++ start:$33 0.0
++ start:$34 1337
+. game.rigidbody:0 start:$29
+. game.shape:0 start:$30
+. transform:0 start:$31
+. fp32:0 start:$32
+. fp32:1 start:$33
+. int32:0 start:$34
+| game.physics.collider.add
+. start:$35 cube
++ vec3_new:x 5
++ vec3_new:y 2
++ vec3_new:z 10
+| vec3_new
+. transform_new:translation vec3_new:return
++ transform_new:rotation IDENTITY
+| transform_new
+. start:$36 transform_new:return
+. game.rigidbody:0 start:$35
+. transform:0 start:$36
+| game.physics.rigidbody.set.transform
 = _loop
-$ start:$34 Int2
-$ start:$35 Int2
-$ start:$36 Int2
+$ start:$15 game.Collection
+$ start:$16 ConstStr
+$ start:$17 Int32
+$ start:$18 game.Vehicle
+$ start:$19 Transform
+$ start:$20 game.Shape
+$ start:$21 Vec3
+$ start:$22 game.RigidBody
+$ start:$23 game.Shape
+$ start:$24 Transform
+$ start:$25 Fp32
+$ start:$26 Fp32
+$ start:$27 Int32
+$ start:$28 Vec3
+$ start:$29 game.RigidBody
+$ start:$30 game.Shape
+$ start:$31 Transform
+$ start:$32 Fp32
+$ start:$33 Fp32
+$ start:$34 Int32
+$ start:$35 game.RigidBody
+$ start:$36 Transform
 
 > _loop
 | game.wait
 = _loop:if.0.switch
 [ _loop:if.0.switch int1:0
-? 0 _loop.1
+? 0 _loop:else.0
 ! _loop:if.0
 > _loop:if.0
 = draw
+> _loop:else.0
+= _loop.1
 > _loop.1
 = step
 
@@ -361,18 +441,83 @@ $ start:$36 Int2
 = _loop
 
 > draw
-+ vec3_new:x 5
-+ vec3_new:y 2
-+ vec3_new:z -1
-| vec3_new
-. transform_new:translation vec3_new:return
-+ transform_new:rotation UNIT
-| transform_new
-. game_graphics_draw_push_transform:trf transform_new:return
-| game_graphics_draw_push_transform
-. game.meshset:0 mesh_set
-+ int32:0 0
-+ int32:1 0
+. draw:$38 cube
+. game.rigidbody:0 draw:$38
+| game.physics.rigidbody.get.transform
+. draw:$37 transform:0
+. draw:$39 draw:$37
++ draw:$40 1
+. transform:0 draw:$39
+. fp32:0 draw:$40
+| game.graphics.draw.push_transform
+. draw:$41 mesh_set
++ draw:$42 0
++ draw:$43 0
+. game.meshset:0 draw:$41
+. int32:0 draw:$42
+. int32:1 draw:$43
 | game.graphics.draw.mesh
 = _loop
+$ draw:$37 Transform
+$ draw:$38 game.RigidBody
+$ draw:$39 Transform
+$ draw:$40 Fp32
+$ draw:$41 game.MeshSet
+$ draw:$42 Int32
+$ draw:$43 Int32
+
+> spawn_enemy
+. game_vehicle_load_const_str:path spawn_enemy:path
+. spawn_enemy:$45 spawn_enemy:id
+. int2:0 spawn_enemy:$45
+| int2.to_32
+. game_vehicle_load_const_str:user_data int32:0
+| game_vehicle_load_const_str
+. spawn_enemy:$44 game_vehicle_load_const_str:return
+. spawn_enemy:$46 spawn_enemy:$44
+. vec3_new:x spawn_enemy:x
+. vec3_new:y spawn_enemy:y
+. vec3_new:z spawn_enemy:z
+| vec3_new
+. transform_new:translation vec3_new:return
++ transform_new:rotation IDENTITY
+| transform_new
+. spawn_enemy:$47 transform_new:return
+. game.vehicle:0 spawn_enemy:$46
+. transform:0 spawn_enemy:$47
+| game.vehicle.set.transform
+| game.script.args.clear
++ spawn_enemy:$48 "vehicle"
+. spawn_enemy:$49 spawn_enemy:$44
+. const_str:0 spawn_enemy:$48
+. game.vehicle:0 spawn_enemy:$49
+| game.script.args.push.const_str+vehicle
++ spawn_enemy:$50 "target"
+. spawn_enemy:$51 player
+. const_str:0 spawn_enemy:$50
+. game.vehicle:0 spawn_enemy:$51
+| game.script.args.push.const_str+vehicle
++ spawn_enemy:$52 "self:ai.pil"
+. const_str:0 spawn_enemy:$52
+| game.script.launch.const_str
+. spawn_enemy:$53 spawn_enemy:$44
+. spawn_enemy:$54 spawn_enemy:id
+{ enemies spawn_enemy:$54 spawn_enemy:$53
+<
+$ spawn_enemy:path ConstStr
+$ spawn_enemy:id Int2
+$ spawn_enemy:x Fp32
+$ spawn_enemy:y Fp32
+$ spawn_enemy:z Fp32
+$ spawn_enemy:$44 game.Vehicle
+$ spawn_enemy:$45 Int2
+$ spawn_enemy:$46 game.Vehicle
+$ spawn_enemy:$47 Transform
+$ spawn_enemy:$48 ConstStr
+$ spawn_enemy:$49 game.Vehicle
+$ spawn_enemy:$50 ConstStr
+$ spawn_enemy:$51 game.Vehicle
+$ spawn_enemy:$52 ConstStr
+$ spawn_enemy:$53 game.Vehicle
+$ spawn_enemy:$54 Int2
 

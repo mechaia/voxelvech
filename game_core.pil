@@ -1,0 +1,584 @@
+( game.Script
+& @ Int32
+)
+
+$ game.script:0 game.Script
+
+
+( game.Vehicle
+& @ Int32
+)
+
+( game.Collection
+& @ Int32
+)
+
+( game.MeshSet
+& @ Int32
+)
+
+$ game.vehicle:0 game.Vehicle
+$ game.collection:0 game.Collection
+$ game.meshset:0 game.MeshSet
+
+## PHYSICS ##
+
+( game.Collider
+& @ Int32
+)
+
+( game.Shape
+& @ Int32
+)
+
+( game.RigidBody
+& @ Int32
+)
+
+$ game.shape:0 game.Shape
+$ game.collider:0 game.Collider
+$ game.rigidbody:0 game.RigidBody
+
+## VEC3 ##
+
+( Vec3
+& x Fp32
+& y Fp32
+& z Fp32
+)
+
+_ Vec3 0
++ x 0
++ y 0
++ z 0
+-
+
+_ Vec3 1
++ x 1
++ y 1
++ z 1
+-
+
+_ Vec3 X
++ x 1
++ y 0
++ z 0
+-
+
+_ Vec3 Y
++ x 0
++ y 1
++ z 0
+-
+
+_ Vec3 Z
++ x 0
++ y 0
++ z 1
+-
+
+$ vec3:0 Vec3
+$ vec3:1 Vec3
+$ @Vec3 Vec3
+
+> vec3@vec01x_to_fp01
+) vec3:0 x fp32:0
+) vec3:1 x fp32:1
+<
+> vec3@vec01y_to_fp01
+) vec3:0 y fp32:0
+) vec3:1 y fp32:1
+<
+> vec3@vec01z_to_fp01
+) vec3:0 z fp32:0
+) vec3:1 z fp32:1
+<
+
+> vec3.splat
+( vec3:0 x fp32:0
+( vec3:0 y fp32:0
+( vec3:0 z fp32:0
+<
+
+> vec3.zxy
+) vec3:0 z fp32:0
+) vec3:0 x fp32:1
+) vec3:0 y fp32:2
+( vec3:0 x fp32:0
+( vec3:0 y fp32:1
+( vec3:0 z fp32:2
+<
+
+> vec3.yzx
+) vec3:0 y fp32:0
+) vec3:0 z fp32:1
+) vec3:0 x fp32:2
+( vec3:0 x fp32:0
+( vec3:0 y fp32:1
+( vec3:0 z fp32:2
+<
+
+> vec3.add
+| vec3@vec01x_to_fp01
+| fp32.add
+( vec3:0 x fp32:0
+| vec3@vec01y_to_fp01
+| fp32.add
+( vec3:0 y fp32:0
+| vec3@vec01z_to_fp01
+| fp32.add
+( vec3:0 z fp32:0
+<
+
+> vec3.sub
+| vec3@vec01x_to_fp01
+| fp32.sub
+( vec3:0 x fp32:0
+| vec3@vec01y_to_fp01
+| fp32.sub
+( vec3:0 y fp32:0
+| vec3@vec01z_to_fp01
+| fp32.sub
+( vec3:0 z fp32:0
+<
+
+> vec3.mul
+| vec3@vec01x_to_fp01
+| fp32.mul
+( vec3:0 x fp32:0
+| vec3@vec01y_to_fp01
+| fp32.mul
+( vec3:0 y fp32:0
+| vec3@vec01z_to_fp01
+| fp32.mul
+( vec3:0 z fp32:0
+<
+
+> vec3.div
+| vec3@vec01x_to_fp01
+| fp32.div
+( vec3:0 x fp32:0
+| vec3@vec01y_to_fp01
+| fp32.div
+( vec3:0 y fp32:0
+| vec3@vec01z_to_fp01
+| fp32.div
+( vec3:0 z fp32:0
+<
+
+
+> vec3.mul.fp32
+. vec3:1 vec3:0
+| vec3.splat
+= vec3.mul
+
+> vec3.div.fp32
+. @Vec3 vec3:0
+. vec3:0 vec3:1
+| vec3.splat
+. vec3:1 vec3:0
+. vec3:0 @Vec3
+= vec3.div
+
+
+> vec3.element_sum
+) vec3:0 x fp32:0
+) vec3:0 y fp32:1
+| fp32.add
+) vec3:0 z fp32:1
+= fp32.add
+
+> vec3.element_mul
+) vec3:0 x fp32:0
+) vec3:0 y fp32:1
+| fp32.mul
+) vec3:0 z fp32:1
+= fp32.mul
+
+
+> vec3.dot
+| vec3.mul
+= vec3.element_sum
+
+
+> vec3.cross
+# Cx = Bz*Ay - Az*By
+# Cy = Bx*Az - Ax*Bz
+# Cz = By*Ax - Ay*Bx
+. vec3.cross:A vec3:0
+. vec3.cross:B vec3:1
+# right
+| vec3.zxy
+. vec3:1 vec3:0
+. vec3:0 vec3.cross:B
+| vec3.yzx
+| vec3.mul
+. vec3.cross:AB.r vec3:0
+# left
+. vec3:0 vec3.cross:B
+| vec3.zxy
+. vec3:1 vec3:0
+. vec3:0 vec3.cross:A
+| vec3.yzx
+| vec3.mul
+. vec3:1 vec3.cross:AB.r
+= vec3.sub
+
+$ vec3.cross:t Vec3
+$ vec3.cross:A Vec3
+$ vec3.cross:B Vec3
+$ vec3.cross:AB.r Vec3
+
+
+> vec3.length_squared
+. vec3:1 vec3:0
+= vec3.dot
+
+> vec3.length
+| vec3.length_squared
+= fp32.sqrt
+
+
+> vec3.normalize
+. @Vec3 vec3:0
+| vec3.length
+. vec3:0 @Vec3
+= vec3.div.fp32
+
+
+## QUAT ##
+
+( Quat
+& x Fp32
+& y Fp32
+& z Fp32
+& w Fp32
+)
+
+_ Quat 0
++ x 0
++ y 0
++ z 0
++ w 0
+-
+
+_ Quat IDENTITY
++ x 0
++ y 0
++ z 0
++ w 1
+-
+
+$ quat:0 Quat
+$ quat:1 Quat
+$ @Quat Quat
+
+# copied from glam-rs
+> quat.mul
+# w0 * x1 + x0 * w1 + y0 * z1 - z0 * y1,
+) quat:0 w fp32:0
+) quat:1 x fp32:1
+| quat.mul:=
+) quat:0 x fp32:0
+) quat:1 w fp32:1
+| quat.mul:+
+) quat:0 y fp32:0
+) quat:1 z fp32:1
+| quat.mul:+
+) quat:0 z fp32:0
+) quat:1 y fp32:1
+| quat.mul:-
+( quat.mul:q x quat.mul:t
+# w0 * y1 - x0 * z1 + y0 * w1 + z0 * x1,
+) quat:0 w fp32:0
+) quat:1 y fp32:1
+| quat.mul:=
+) quat:0 x fp32:0
+) quat:1 z fp32:1
+| quat.mul:-
+) quat:0 y fp32:0
+) quat:1 w fp32:1
+| quat.mul:+
+) quat:0 z fp32:0
+) quat:1 x fp32:1
+| quat.mul:+
+( quat.mul:q y quat.mul:t
+# w0 * z1 + x0 * y1 - y0 * x1 + z0 * w1,
+) quat:0 w fp32:0
+) quat:1 z fp32:1
+| quat.mul:=
+) quat:0 x fp32:0
+) quat:1 y fp32:1
+| quat.mul:+
+) quat:0 y fp32:0
+) quat:1 x fp32:1
+| quat.mul:-
+) quat:0 z fp32:0
+) quat:1 w fp32:1
+| quat.mul:+
+( quat.mul:q z quat.mul:t
+# w0 * w1 - x0 * x1 - y0 * y1 - z0 * z1,
+) quat:0 w fp32:0
+) quat:1 w fp32:1
+| quat.mul:=
+) quat:0 x fp32:0
+) quat:1 x fp32:1
+| quat.mul:-
+) quat:0 y fp32:0
+) quat:1 y fp32:1
+| quat.mul:-
+) quat:0 z fp32:0
+) quat:1 z fp32:1
+| quat.mul:-
+( quat.mul:q w quat.mul:t
+# finish
+. quat:0 quat.mul:q
+<
+# t = (a * b)
+> quat.mul:=
+| fp32.mul
+. quat.mul:t fp32:0
+<
+# t += (a * b)
+> quat.mul:+
+| fp32.mul
+. fp32:1 quat.mul:t
+| fp32.add
+. quat.mul:t fp32:0
+<
+# t -= (a * b)
+> quat.mul:-
+| fp32.mul
+. fp32:1 quat.mul:t
+| fp32.sub
+. quat.mul:t fp32:0
+<
+$ quat.mul:t Fp32
+$ quat.mul:q Quat
+
+
+# also copied form glam-rs
+> quat.mul.vec3
+. quat.mul.vec3:other vec3:0
+# b = XYZ { ...quat.xyz }
+| quat.xyz
+# b2 = b.dot(b)
+| vec3.length_squared
+. quat.mul.vec3:b2 fp32:0
+# w * w - b2
+) quat:0 w fp32:0
+| fp32.square
+. fp32:1 quat.mul.vec3:b2
+| fp32.sub
+# A = other.mul_scalar(w * w - b2)
+. vec3:0 quat.mul.vec3:other
+| vec3.mul.fp32
+. quat.mul.vec3:A vec3:0
+# B = b.mul_scalar(other.dot(b) * 2)
+| quat.xyz
+. vec3:1 quat.mul.vec3:other
+| vec3.dot
++ fp32:1 2
+| fp32.mul
+. fp32:1 fp32:0
+| quat.xyz
+. fp32:0 fp32:1
+| vec3.mul.fp32
+. quat.mul.vec3:B vec3:0
+# C = b.cross(other).mul_scalar(w * 2)
+| quat.xyz
+. vec3:1 quat.mul.vec3:other
+| vec3.cross
+) quat:0 w fp32:0
++ fp32:1 2
+| fp32.mul
+| vec3.mul.fp32
+# A + B + C
+. vec3:1 quat.mul.vec3:A
+| vec3.add
+. vec3:1 quat.mul.vec3:B
+= vec3.add
+$ quat.mul.vec3:other Vec3
+$ quat.mul.vec3:w Fp32
+$ quat.mul.vec3:b2 Fp32
+$ quat.mul.vec3:A Vec3
+$ quat.mul.vec3:B Vec3
+
+
+> quat.xyz
+) quat:0 x fp32:0
+( vec3:0 x fp32:0
+) quat:0 y fp32:0
+( vec3:0 y fp32:0
+) quat:0 z fp32:0
+( vec3:0 z fp32:0
+<
+
+
+## TRANSFORM ##
+
+( Transform
+& rotation Quat
+& translation Vec3
+)
+
+_ Transform IDENTITY
++ rotation IDENTITY
++ translation 0
+-
+
+_ Transform 0
++ rotation 0
++ translation 0
+-
+
+$ transform:0 Transform
+
+
+## GAME ##
+
+# game.arg
+
+# builtin: game.arg.int32.path
+# builtin: game.arg.fp32.path
+# builtin: game.arg.path.path
+
+> game.arg.vehicle.path
+| game.arg.int32.path
+( game.vehicle:0 @ int32:0
+<
+
+
+> game.arg.int32.const_str
+| game.path.set.const_str
+= game.arg.int32.path
+
+
+> game.arg.fp32.path
+| game.arg.int32.path
+= fp32.from_int_bits
+
+> game.arg.fp32.const_str
+| game.path.set.const_str
+= game.arg.fp32.path
+
+
+> game.arg.path.const_str
+| game.path.set.const_str
+= game.arg.path.path
+
+> game.arg.vehicle.const_str
+| game.path.set.const_str
+= game.arg.vehicle.path
+
+
+# game.path
+
+# builtin: game.path.push
+# builtin: game.path.len
+# builtin: game.path.get
+# builtin: game.path.clear
+
+> game.path.set.const_str
+| game.path.clear
+= game.path.append.const_str
+
+> game.path.append.const_str
++ game.path.append.const_str:index 0
+= game.path.append.const_str:cond
+> game.path.append.const_str:cond
+| const_str.len
+. int32:1 game.path.append.const_str:index
+| int32.eq
+= game.path.append.const_str:switch
+[ game.path.append.const_str:switch int1:0
+? 1 noop
+! game.path.append.const_str:loop
+> game.path.append.const_str:loop
+. int32:0 game.path.append.const_str:index
+| const_str.get
+| game.path.push
+| int32.inc
+. game.path.append.const_str:index int32:0
+= game.path.append.const_str:cond
+$ game.path.append.const_str:index Int32
+
+
+# game.input
+
+# builtin: game.input.get.path
+
+> game.input.get.const_str
+| game.path.set.const_str
+= game.input.get.path
+
+
+# game.vehicle
+
+# builtin: game.vehicle.load.path
+# builtin: game.vehicle.set.input.path
+
+> game.vehicle.load.const_str
+. game.vehicle.load.const_str:udata int32:0
+| game.path.set.const_str
+. int32:0 game.vehicle.load.const_str:udata
+= game.vehicle.load.path
+$ game.vehicle.load.const_str:udata Int32
+
+> game.vehicle.set.input.const_str
+| game.path.set.const_str
+= game.vehicle.set.input.path
+
+
+# game.script
+
+# builtin: game.script.launch.path
+# builtin: game.script.args.clear
+# builtin: game.script.args.push_key.path
+# builtin: game.script.args.push_value.int32
+# builtin: game.script.args.push_value.path
+
+> game.script.launch.const_str
+| game.path.set.const_str
+= game.script.launch.path
+
+
+> game.script.args.push_key.const_str
+| game.path.set.const_str
+= game.script.args.push_key.path
+
+
+> game.script.args.push_value.fp32
+| fp32.to_int_bits
+= game.script.args.push_value.int32
+
+
+> game.script.args.push.path+int32
+| game.script.args.push_key.path
+= game.script.args.push_value.int32
+
+> game.script.args.push.const_str+int32
+| game.script.args.push_key.const_str
+= game.script.args.push_value.int32
+
+
+> game.script.args.push.path+fp32
+| game.script.args.push_key.path
+= game.script.args.push_value.fp32
+
+> game.script.args.push.const_str+fp32
+| game.script.args.push_key.const_str
+= game.script.args.push_value.fp32
+
+
+> game.script.args.push_value.vehicle
+) game.vehicle:0 @ int32:0 
+= game.script.args.push_value.int32
+
+> game.script.args.push.path+vehicle
+| game.script.args.push_key.path
+= game.script.args.push_value.vehicle
+
+> game.script.args.push.const_str+vehicle
+| game.script.args.push_key.const_str
+= game.script.args.push_value.vehicle

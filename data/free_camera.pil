@@ -1,0 +1,9 @@
+> start
+| game.wait
+= start:switch
+[ start:switch
+? 1 start # draw
+! step # step
+
+> step
+= start

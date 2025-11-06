@@ -222,33 +222,49 @@ impl Vehicle {
         self.physics.set_transform(physics, transform)
     }
 
+    pub fn set_input(
+        &mut self,
+        state: &crate::State,
+        physics: &Physics,
+        name: &str,
+        value: f32,
+    ) {
+        let com = self.physics.center_of_mass(physics);
+        let value = value.clamp(-1.0, 1.0);
+        match name {
+            "steer" => {
+                let wheel_max_angle = core::f32::consts::FRAC_PI_6;
+                for (&pos, w) in self.physics.pos_to_wheel.iter() {
+                    let value = if (pos.x as f32) < com.x { -value } else { value };
+                    self.physics
+                        .vehicle_body
+                        .set_wheel_angle(w.handle, value * wheel_max_angle);
+                }
+            }
+            "forward" => {
+                let wheel_max_torque = 1000.0;
+                let wheel_max_torque = 100.0;
+                let brake = f32::from(value == 0.0);
+                for (&pos, w) in self.physics.pos_to_wheel.iter() {
+                    let value = if pos.y < 0 { -value } else { value };
+                    self.physics
+                        .vehicle_body
+                        .set_wheel_torque(w.handle, value * wheel_max_torque);
+                    self.physics.vehicle_body.set_wheel_brake(w.handle, brake);
+                }
+            }
+            _ => crate::log::warn(format!("invalid input {name}")),
+        }
+    }
+
     pub fn set_input_controls(
         &mut self,
         state: &crate::State,
         physics: &Physics,
         controls: &InputControls,
     ) -> Vec<Projectile> {
-        // movement
-        let com = self.physics.center_of_mass(physics);
-
-        let wheel_max_torque = 1000.0;
-        let wheel_max_angle = core::f32::consts::FRAC_PI_6;
-        let forward = controls.forward.clamp(-1.0, 1.0);
-        let brake = f32::from(forward == 0.0);
-        let pan = controls.pan.clamp(-1.0, 1.0);
-
-        for (&pos, w) in self.physics.pos_to_wheel.iter() {
-            //let forward = if pos.x < 0 { -forward } else { forward };
-            let forward = if pos.y < 0 { -forward } else { forward };
-            let pan = if (pos.x as f32) < com.x { -pan } else { pan };
-            self.physics
-                .vehicle_body
-                .set_wheel_angle(w.handle, pan * wheel_max_angle);
-            self.physics
-                .vehicle_body
-                .set_wheel_torque(w.handle, forward * wheel_max_torque);
-            self.physics.vehicle_body.set_wheel_brake(w.handle, brake);
-        }
+        self.set_input(state, physics, "steer", controls.pan);
+        self.set_input(state, physics, "forward", controls.forward);
 
         // aim target
         let trf = self.physics.transform(physics);

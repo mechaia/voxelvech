@@ -1,3 +1,5 @@
+#![deny(unreachable_patterns)]
+
 mod camera;
 mod data;
 mod editor;

@@ -1,0 +1,551 @@
+# Enums:
+# Records:
+#   Transform <__main__.Record object at 0x7ffff73f8dd0>
+#   Quat <__main__.Record object at 0x7ffff73f8f50>
+#   Vec3 <__main__.Record object at 0x7ffff73f9210>
+# Constants:
+#   Transform 0
+#     (il)
+#   Transform IDENTITY
+#     (il)
+#   Quat 0
+#     (il)
+#   Quat IDENTITY
+#     (il)
+#   Vec3 0
+#     (il)
+#   Vec3 1
+#     (il)
+#   Vec3 X
+#     (il)
+#   Vec3 Y
+#     (il)
+#   Vec3 Z
+#     (il)
+# Registers:
+#   game_Vehicle vehicle
+#   game_Vehicle target
+# Functions:
+#   transform_new
+#     Transform <__main__.AssignUnit object at 0x7ffff759cfd0>
+#     <__main__.AssignUnit object at 0x7ffff73f9bd0> = <rotation>
+#     <__main__.AssignUnit object at 0x7ffff73f9d90> = <translation>
+#     return <t>
+#   quat_new
+#     Quat <__main__.AssignUnit object at 0x7ffff73fa210>
+#     <__main__.AssignUnit object at 0x7ffff73fa410> = <x>
+#     <__main__.AssignUnit object at 0x7ffff73fa550> = <y>
+#     <__main__.AssignUnit object at 0x7ffff73fa690> = <z>
+#     <__main__.AssignUnit object at 0x7ffff73fa810> = <w>
+#     return <q>
+#   vec3_new
+#     Vec3 <__main__.AssignUnit object at 0x7ffff73fad50>
+#     <__main__.AssignUnit object at 0x7ffff73fafd0> = <x>
+#     <__main__.AssignUnit object at 0x7ffff73fb150> = <y>
+#     <__main__.AssignUnit object at 0x7ffff73fb350> = <z>
+#     return <v>
+#   fp32_add
+#      (il.function)
+#   fp32_sub
+#      (il.function)
+#   fp32_mul
+#      (il.function)
+#   fp32_div
+#      (il.function)
+#   fp32_min
+#      (il.function)
+#   fp32_max
+#      (il.function)
+#   fp32_sqrt
+#      (il.function)
+#   fp32_eq
+#      (il.function)
+#   fp32_lt
+#      (il.function)
+#   fp32_gt
+#      (il.function)
+#   int32_add
+#      (il.function)
+#   int32_inc
+#      (il.function)
+#   int32_eq
+#      (il.function)
+#   int32_ge
+#      (il.function)
+#   int2_to_32
+#      (il.function)
+#   const_str_len
+#      (il.function)
+#   const_str_get
+#      (il.function)
+#   vec3_add
+#      (il.function)
+#   vec3_sub
+#      (il.function)
+#   vec3_mul
+#      (il.function)
+#   vec3_dot
+#      (il.function)
+#   vec3_cross
+#      (il.function)
+#   vec3_mul_fp32
+#      (il.function)
+#   vec3_normalize
+#      (il.function)
+#   vec3_length
+#      (il.function)
+#   vec3_length_squared
+#      (il.function)
+#   vec3_element_sum
+#      (il.function)
+#   vec3_element_mul
+#      (il.function)
+#   quat_mul_vec3
+#      (il.function)
+#   game_wait
+#      (il.function)
+#   game_arg_int32_path
+#      (il.function)
+#   game_arg_fp32_path
+#      (il.function)
+#   game_arg_path_path
+#      (il.function)
+#   game_arg_vehicle_path
+#      (il.function)
+#   game_arg_int32_const_str
+#      (il.function)
+#   game_arg_fp32_const_str
+#      (il.function)
+#   game_arg_path_const_str
+#      (il.function)
+#   game_arg_vehicle_const_str
+#      (il.function)
+#   game_gltf_load
+#      (il.function)
+#   game_gltf_load_const_str
+#     <game_path_set_const_str>(<path>)
+#     return <game_gltf_load>()
+#   game_graphics_add_mesh_set
+#      (il.function)
+#   game_graphics_draw_push_transform
+#      (il.function)
+#   game_graphics_draw_mesh
+#      (il.function)
+#   game_vehicle_load_path
+#      (il.function)
+#   game_vehicle_load_const_str
+#     <game_path_set_const_str>(<path>)
+#     return <game_vehicle_load_path>(<user_data>)
+#   game_vehicle_get_transform
+#      (il.function)
+#   game_vehicle_set_transform
+#      (il.function)
+#   game_vehicle_set_input_const_str
+#      (il.function)
+#   game_input_get_path
+#      (il.function)
+#   game_input_get_const_str
+#      (il.function)
+#   game_physics_rigidbody_add_fixed
+#      (il.function)
+#   game_physics_rigidbody_add_dynamic
+#      (il.function)
+#   game_physics_rigidbody_get_transform
+#      (il.function)
+#   game_physics_rigidbody_set_transform
+#      (il.function)
+#   game_physics_shape_make_compound_push
+#      (il.function)
+#   game_physics_shape_make_compound
+#      (il.function)
+#   game_physics_shape_make_cuboid
+#      (il.function)
+#   game_physics_shape_make_halfspace
+#      (il.function)
+#   game_physics_collider_add
+#      (il.function)
+#   game_path_push
+#      (il.function)
+#   game_path_len
+#      (il.function)
+#   game_path_get
+#      (il.function)
+#   game_path_clear
+#      (il.function)
+#   game_path_set_const_str
+#      (il.function)
+#   game_script_args_clear
+#      (il.function)
+#   game_script_args_push_const_str__vehicle
+#      (il.function)
+#   game_script_launch_const_str
+#      (il.function)
+#   game_debug_fp32
+#      (il.function)
+#   start
+#     <__main__.AssignUnit object at 0x7ffff7210f10> = <game_arg_vehicle_const_str>(TokenStr['vehicle'])
+#     <__main__.AssignUnit object at 0x7ffff7211190> = <game_arg_vehicle_const_str>(TokenStr['target'])
+#     become <_loop>()
+#   _loop
+#     <game_wait>()
+#     Transform <__main__.AssignUnit object at 0x7ffff72118d0>
+#     Transform <__main__.AssignUnit object at 0x7ffff73f9fd0> = <game_vehicle_get_transform>(<vehicle>)
+#     Vec3 <__main__.AssignUnit object at 0x7ffff7211e10> = <quat_mul_vec3>(<t0.rotation>, <X>)
+#     Vec3 <__main__.AssignUnit object at 0x7ffff72122d0> = <quat_mul_vec3>(<t0.rotation>, <Y>)
+#     Vec3 <__main__.AssignUnit object at 0x7ffff72127d0> = <quat_mul_vec3>(<t0.rotation>, <Z>)
+#     Transform <__main__.AssignUnit object at 0x7ffff7212c90> = <game_vehicle_get_transform>(<target>)
+#     Vec3 <__main__.AssignUnit object at 0x7ffff7213050> = <vec3_sub>(<t1.translation>, <t0.translation>)
+#     Vec3 <__main__.AssignUnit object at 0x7ffff72135d0> = <vec3_normalize>(<rel_pos>)
+#     Fp32 <__main__.AssignUnit object at 0x7ffff7213950> = <vec3_dot>(<vec3_cross>(<forward>, <rel_dir>), <up>)
+#     Fp32 <__main__.AssignUnit object at 0x7ffff721c090> = <vec3_dot>(<vec3_cross>(<right>, <rel_dir>), <up>)
+#     Fp32 <__main__.AssignUnit object at 0x7ffff721c7d0> = <vec3_length>(<rel_pos>)
+#     Fp32 <__main__.AssignUnit object at 0x7ffff721ca50>
+#     if
+#       <__main__.AssignUnit object at 0x7ffff721cf90> = <1>
+#     else
+#       <__main__.AssignUnit object at 0x7ffff721d3d0> = <fp32_mul>(<direction_2>, <10>)
+#     <game_vehicle_set_input_const_str>(<vehicle>, TokenStr['steer'], <steer>)
+#     Fp32 <__main__.AssignUnit object at 0x7ffff721dc50> = <fp32_max>(<fp32_div>(<fp32_sub>(<distance>, <32>), <128>), <0>)
+#     <game_debug_fp32>(TokenStr['forward'], <forward>)
+#     <game_debug_fp32>(TokenStr['X'], <fp32_min>(<5>, <3>))
+#     <game_debug_fp32>(TokenStr['X'], <fp32_min>(<3>, <5>))
+#     <game_debug_fp32>(TokenStr['X'], <fp32_max>(<5>, <3>))
+#     <game_debug_fp32>(TokenStr['X'], <fp32_max>(<13>, <15>))
+#     <game_vehicle_set_input_const_str>(<vehicle>, TokenStr['forward'], <forward>)
+#     become <_loop>()
+
+$ vehicle game.Vehicle
+$ target game.Vehicle
+
+> transform_new
+. transform_new:$1 transform_new:rotation
+( transform_new:$0 rotation transform_new:$1
+. transform_new:$2 transform_new:translation
+( transform_new:$0 translation transform_new:$2
+. transform_new:return transform_new:$0
+<
+$ transform_new:translation Vec3
+$ transform_new:rotation Quat
+$ transform_new:return Transform
+$ transform_new:$0 Transform
+$ transform_new:$1 Quat
+$ transform_new:$2 Vec3
+
+> quat_new
+. quat_new:$4 quat_new:x
+( quat_new:$3 x quat_new:$4
+. quat_new:$5 quat_new:y
+( quat_new:$3 y quat_new:$5
+. quat_new:$6 quat_new:z
+( quat_new:$3 z quat_new:$6
+. quat_new:$7 quat_new:w
+( quat_new:$3 w quat_new:$7
+. quat_new:return quat_new:$3
+<
+$ quat_new:x Fp32
+$ quat_new:y Fp32
+$ quat_new:z Fp32
+$ quat_new:w Fp32
+$ quat_new:return Quat
+$ quat_new:$3 Quat
+$ quat_new:$4 Fp32
+$ quat_new:$5 Fp32
+$ quat_new:$6 Fp32
+$ quat_new:$7 Fp32
+
+> vec3_new
+. vec3_new:$9 vec3_new:x
+( vec3_new:$8 x vec3_new:$9
+. vec3_new:$10 vec3_new:y
+( vec3_new:$8 y vec3_new:$10
+. vec3_new:$11 vec3_new:z
+( vec3_new:$8 z vec3_new:$11
+. vec3_new:return vec3_new:$8
+<
+$ vec3_new:x Fp32
+$ vec3_new:y Fp32
+$ vec3_new:z Fp32
+$ vec3_new:return Vec3
+$ vec3_new:$8 Vec3
+$ vec3_new:$9 Fp32
+$ vec3_new:$10 Fp32
+$ vec3_new:$11 Fp32
+
+> game_gltf_load_const_str
+. game_gltf_load_const_str:$12 game_gltf_load_const_str:path
+. const_str:0 game_gltf_load_const_str:$12
+| game.path.set.const_str
+| game.gltf.load
+. game_gltf_load_const_str:return game.collection:0
+<
+$ game_gltf_load_const_str:path ConstStr
+$ game_gltf_load_const_str:return game.Collection
+$ game_gltf_load_const_str:$12 ConstStr
+
+> game_vehicle_load_const_str
+. game_vehicle_load_const_str:$13 game_vehicle_load_const_str:path
+. const_str:0 game_vehicle_load_const_str:$13
+| game.path.set.const_str
+. game_vehicle_load_const_str:$14 game_vehicle_load_const_str:user_data
+. int32:0 game_vehicle_load_const_str:$14
+| game.vehicle.load.path
+. game_vehicle_load_const_str:return game.vehicle:0
+<
+$ game_vehicle_load_const_str:path ConstStr
+$ game_vehicle_load_const_str:user_data Int32
+$ game_vehicle_load_const_str:return game.Vehicle
+$ game_vehicle_load_const_str:$13 ConstStr
+$ game_vehicle_load_const_str:$14 Int32
+
+> start
++ start:$15 "vehicle"
+. const_str:0 start:$15
+| game.arg.vehicle.const_str
+. vehicle game.vehicle:0
++ start:$16 "target"
+. const_str:0 start:$16
+| game.arg.vehicle.const_str
+. target game.vehicle:0
+= _loop
+$ start:$15 ConstStr
+$ start:$16 ConstStr
+
+> _loop
+| game.wait
+. _loop:$19 vehicle
+. game.vehicle:0 _loop:$19
+| game.vehicle.get.transform
+. _loop:$18 transform:0
+) _loop:$18 rotation _loop:$22
+. _loop:$21 _loop:$22
++ _loop:$23 X
+. quat:0 _loop:$21
+. vec3:0 _loop:$23
+| quat.mul.vec3
+. _loop:$20 vec3:0
+) _loop:$18 rotation _loop:$26
+. _loop:$25 _loop:$26
++ _loop:$27 Y
+. quat:0 _loop:$25
+. vec3:0 _loop:$27
+| quat.mul.vec3
+. _loop:$24 vec3:0
+) _loop:$18 rotation _loop:$30
+. _loop:$29 _loop:$30
++ _loop:$31 Z
+. quat:0 _loop:$29
+. vec3:0 _loop:$31
+| quat.mul.vec3
+. _loop:$28 vec3:0
+. _loop:$33 target
+. game.vehicle:0 _loop:$33
+| game.vehicle.get.transform
+. _loop:$32 transform:0
+) _loop:$32 translation _loop:$36
+. _loop:$35 _loop:$36
+) _loop:$18 translation _loop:$38
+. _loop:$37 _loop:$38
+. vec3:0 _loop:$35
+. vec3:1 _loop:$37
+| vec3.sub
+. _loop:$34 vec3:0
+. _loop:$40 _loop:$34
+. vec3:0 _loop:$40
+| vec3.normalize
+. _loop:$39 vec3:0
+. _loop:$43 _loop:$20
+. _loop:$44 _loop:$39
+. vec3:0 _loop:$43
+. vec3:1 _loop:$44
+| vec3.cross
+. _loop:$42 vec3:0
+. _loop:$45 _loop:$28
+. vec3:0 _loop:$42
+. vec3:1 _loop:$45
+| vec3.dot
+. _loop:$41 fp32:0
+. _loop:$48 _loop:$24
+. _loop:$49 _loop:$39
+. vec3:0 _loop:$48
+. vec3:1 _loop:$49
+| vec3.cross
+. _loop:$47 vec3:0
+. _loop:$50 _loop:$28
+. vec3:0 _loop:$47
+. vec3:1 _loop:$50
+| vec3.dot
+. _loop:$46 fp32:0
+. _loop:$52 _loop:$34
+. vec3:0 _loop:$52
+| vec3.length
+. _loop:$51 fp32:0
+. _loop.1:$54 _loop:$46
++ _loop.1:$55 0
+. fp32:0 _loop.1:$54
+. fp32:1 _loop.1:$55
+| fp32.gt
+= _loop:if.0.switch
+[ _loop:if.0.switch int1:0
+? 0 _loop:else.0
+! _loop:if.0
+> _loop:if.0
++ _loop:$53 1
+= _loop.1
+> _loop:else.0
+. _loop:else.0:$56 _loop:$41
++ _loop:else.0:$57 10
+. fp32:0 _loop:else.0:$56
+. fp32:1 _loop:else.0:$57
+| fp32.mul
+. _loop:$53 fp32:0
+= _loop.1
+> _loop.1
+. _loop.1:$58 vehicle
++ _loop.1:$59 "steer"
+. _loop.1:$60 _loop:$53
+. game.vehicle:0 _loop.1:$58
+. const_str:0 _loop.1:$59
+. fp32:0 _loop.1:$60
+| game.vehicle.set.input.const_str
+. _loop.1:$64 _loop:$51
++ _loop.1:$65 32
+. fp32:0 _loop.1:$64
+. fp32:1 _loop.1:$65
+| fp32.sub
+. _loop.1:$63 fp32:0
++ _loop.1:$66 128
+. fp32:0 _loop.1:$63
+. fp32:1 _loop.1:$66
+| fp32.div
+. _loop.1:$62 fp32:0
++ _loop.1:$67 0
+. fp32:0 _loop.1:$62
+. fp32:1 _loop.1:$67
+| fp32.max
+. _loop.1:$61 fp32:0
++ _loop.1:$68 "forward"
+. _loop.1:$69 _loop.1:$61
+. const_str:0 _loop.1:$68
+. fp32:0 _loop.1:$69
+| game.debug.fp32
++ _loop.1:$70 "X"
++ _loop.1:$72 5
++ _loop.1:$73 3
+. fp32:0 _loop.1:$72
+. fp32:1 _loop.1:$73
+| fp32.min
+. _loop.1:$71 fp32:0
+. const_str:0 _loop.1:$70
+. fp32:0 _loop.1:$71
+| game.debug.fp32
++ _loop.1:$74 "X"
++ _loop.1:$76 3
++ _loop.1:$77 5
+. fp32:0 _loop.1:$76
+. fp32:1 _loop.1:$77
+| fp32.min
+. _loop.1:$75 fp32:0
+. const_str:0 _loop.1:$74
+. fp32:0 _loop.1:$75
+| game.debug.fp32
++ _loop.1:$78 "X"
++ _loop.1:$80 5
++ _loop.1:$81 3
+. fp32:0 _loop.1:$80
+. fp32:1 _loop.1:$81
+| fp32.max
+. _loop.1:$79 fp32:0
+. const_str:0 _loop.1:$78
+. fp32:0 _loop.1:$79
+| game.debug.fp32
++ _loop.1:$82 "X"
++ _loop.1:$84 13
++ _loop.1:$85 15
+. fp32:0 _loop.1:$84
+. fp32:1 _loop.1:$85
+| fp32.max
+. _loop.1:$83 fp32:0
+. const_str:0 _loop.1:$82
+. fp32:0 _loop.1:$83
+| game.debug.fp32
+. _loop.1:$86 vehicle
++ _loop.1:$87 "forward"
+. _loop.1:$88 _loop.1:$61
+. game.vehicle:0 _loop.1:$86
+. const_str:0 _loop.1:$87
+. fp32:0 _loop.1:$88
+| game.vehicle.set.input.const_str
+= _loop
+$ _loop:$17 Transform
+$ _loop:$18 Transform
+$ _loop:$19 game.Vehicle
+$ _loop:$20 Vec3
+$ _loop:$21 Quat
+$ _loop:$22 Quat
+$ _loop:$23 Vec3
+$ _loop:$24 Vec3
+$ _loop:$25 Quat
+$ _loop:$26 Quat
+$ _loop:$27 Vec3
+$ _loop:$28 Vec3
+$ _loop:$29 Quat
+$ _loop:$30 Quat
+$ _loop:$31 Vec3
+$ _loop:$32 Transform
+$ _loop:$33 game.Vehicle
+$ _loop:$34 Vec3
+$ _loop:$35 Vec3
+$ _loop:$36 Vec3
+$ _loop:$37 Vec3
+$ _loop:$38 Vec3
+$ _loop:$39 Vec3
+$ _loop:$40 Vec3
+$ _loop:$41 Fp32
+$ _loop:$42 Vec3
+$ _loop:$43 Vec3
+$ _loop:$44 Vec3
+$ _loop:$45 Vec3
+$ _loop:$46 Fp32
+$ _loop:$47 Vec3
+$ _loop:$48 Vec3
+$ _loop:$49 Vec3
+$ _loop:$50 Vec3
+$ _loop:$51 Fp32
+$ _loop:$52 Vec3
+$ _loop:$53 Fp32
+$ _loop.1:$54 Fp32
+$ _loop.1:$55 Fp32
+$ _loop:else.0:$56 Fp32
+$ _loop:else.0:$57 Fp32
+$ _loop.1:$58 game.Vehicle
+$ _loop.1:$59 ConstStr
+$ _loop.1:$60 Fp32
+$ _loop.1:$61 Fp32
+$ _loop.1:$62 Fp32
+$ _loop.1:$63 Fp32
+$ _loop.1:$64 Fp32
+$ _loop.1:$65 Fp32
+$ _loop.1:$66 Fp32
+$ _loop.1:$67 Fp32
+$ _loop.1:$68 ConstStr
+$ _loop.1:$69 Fp32
+$ _loop.1:$70 ConstStr
+$ _loop.1:$71 Fp32
+$ _loop.1:$72 Fp32
+$ _loop.1:$73 Fp32
+$ _loop.1:$74 ConstStr
+$ _loop.1:$75 Fp32
+$ _loop.1:$76 Fp32
+$ _loop.1:$77 Fp32
+$ _loop.1:$78 ConstStr
+$ _loop.1:$79 Fp32
+$ _loop.1:$80 Fp32
+$ _loop.1:$81 Fp32
+$ _loop.1:$82 ConstStr
+$ _loop.1:$83 Fp32
+$ _loop.1:$84 Fp32
+$ _loop.1:$85 Fp32
+$ _loop.1:$86 game.Vehicle
+$ _loop.1:$87 ConstStr
+$ _loop.1:$88 Fp32
+

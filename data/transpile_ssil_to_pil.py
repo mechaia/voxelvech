@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 
+"""
+This transpiler is hot fucking garbage. Avoid using it.
+"""
+
 # Python because I'm a lazy fuck
 
 CHAR_GROUP_IDENT = 'abcdefghijklmnopqrstuvwxyz_ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
@@ -103,6 +107,11 @@ def tokenize(text: str):
     #return _trace_iter(f())
     return f()
 
+class Record:
+    def __init__(self, fields, emit):
+        self.fields = fields
+        self.emit = emit
+
 class Statement: pass
 
 class Standard(Statement):
@@ -142,9 +151,13 @@ class Become(Statement):
         return f'become {self.function}({", ".join(map(repr, self.args))})'
 
 class If(Statement):
-    def __init__(self, expr, scope):
+    def __init__(self, expr, scope, otherwise):
+        assert isinstance(expr, Expr)
+        assert isinstance(scope, Scope)
+        assert isinstance(otherwise, Scope)
         self.expr = expr
         self.scope = scope
+        self.otherwise = otherwise
 
 class For(Statement): pass
 
@@ -173,6 +186,20 @@ class ExprValue(Expr):
 
     def __repr__(self):
         return f'{self.value}'
+
+class ExprArray(Expr):
+    def __init__(self, array, index):
+        if isinstance(array, Path):
+            array, = array.components
+        else:
+            assert isinstance(array, TokenIdent)
+            array = array.value
+        assert isinstance(index, Expr)
+        self.array = array
+        self.index = index
+
+    def __repr__(self):
+        return f'{self.array}[{self.index}]'
 
 class ExprCall(Expr):
     def __init__(self, function, args):
@@ -292,8 +319,47 @@ class Unit:
         self.records = {}
         self.functions = {}
         self.registers = {}
+        self.type_name_remap = {}
 
     def to_il(self):
+
+        def ty_remap(ty):
+            if ty is None:
+                return
+            if isinstance(ty, str):
+                return self.type_name_remap.get(ty, ty)
+            if isinstance(ty, UnitType):
+                ty.name = self.type_name_remap.get(ty.name, ty.name)
+                return ty
+            if isinstance(ty, ArrayType):
+                ty.index = self.type_name_remap.get(ty.index, ty.index)
+                ty.value = self.type_name_remap.get(ty.value, ty.value)
+                return ty
+            assert 0, ty
+        for record in self.records.values():
+            for name, ty in record.fields.items():
+                record.fields[name] = ty_remap(ty)
+        for name, ty in self.registers.items():
+            self.registers[name] = ty_remap(ty)
+        for fn in self.functions.values():
+            def f(scope):
+                for stmt in scope.statements:
+                    if type(stmt) in (Return, Become):
+                        pass
+                    elif type(stmt) in (Loop, If):
+                        f(stmt.scope)
+                        f(stmt.otherwise)
+                    elif isinstance(stmt, Standard):
+                        stmt.ty = ty_remap(stmt.ty)
+                    else:
+                        assert 0, type(stmt)
+            for arg in fn.args:
+                arg.ty = ty_remap(arg.ty)
+            fn.ret_type = ty_remap(fn.ret_type)
+            if not isinstance(fn, IlFunction):
+                f(fn.root)
+
+
         unit = self
         temp_register_counter = 0
 
@@ -391,7 +457,7 @@ class Unit:
                             yield from handler(reg, reg_ty, expr)
                             return
                         field, *rest = components
-                        f_reg_ty = unit.records[reg_ty][field]
+                        f_reg_ty = unit.records[reg_ty].fields[field]
                         f_reg = self.add_register(None, f_reg_ty)
                         yield from f(f_reg, f_reg_ty, rest)
                         yield f'( {reg} {field} {f_reg}\n'
@@ -416,12 +482,16 @@ class Unit:
         yield '\n'
 
         for name, rec in self.records.items():
+            if not rec.emit:
+                continue
             yield f'( {name}\n'
-            for field, ty in rec.items():
+            for field, ty in rec.fields.items():
                 yield f'& {field} {ty}\n'
             yield ')\n\n'
 
         for (ty, name), fields in self.constants.items():
+            if fields is None:
+                continue
             yield f'_ {ty} {name}\n'
             for k, v in fields.items():
                 yield f'+ {k} {v}\n'
@@ -464,12 +534,15 @@ class Unit:
                     pass
                 else:
                     for field in rest:
-                        f_ty = unit.records[reg_ty][field]
+                        f_ty = unit.records[reg_ty].fields[field]
                         f_reg = ctx.add_register(None, ty)
                         yield f') {reg} {field} {f_reg}\n'
                         reg, reg_ty = f_reg, f_ty
                     assert ty is None or ty == reg_ty, (ty, reg_ty, rest)
                     return reg, reg_ty, False
+                if ty == 'Fp32' and len(rest) == 1:
+                    if path_or_value[0] in '0123456789-' and all(c in '0123456789_' for c in path_or_value[1:] + rest[0]):
+                        return f'{path_or_value}.{rest[0]}', ty, True
                 assert rest == []
                 if (ty, path_or_value) in unit.constants:
                     return path_or_value, ty, True
@@ -484,12 +557,22 @@ class Unit:
                     function, = expr.function.components
                     call_fn = self.functions[function]
                     arg_regs = functions_arg_to_reg[function]
-                    for arg, (ty, reg) in zip(expr.args, arg_regs):
-                        _, expr_ty = yield from parse_expr(ctx, reg, arg, ty)
-                        assert ty == expr_ty, f'{ty} == {expr_ty}'
+                    if len(expr.args) != len(arg_regs):
+                        raise Exception(f'argument mismatch when calling {function} in {name}')
                     if isinstance(call_fn, IlFunction):
+                        temp_regs = []
+                        for arg, (ty, _) in zip(expr.args, arg_regs):
+                            r = ctx.add_register(None, ty)
+                            _, expr_ty = yield from parse_expr(ctx, r, arg, ty)
+                            assert ty == expr_ty, f'{ty} == {expr_ty}'
+                            temp_regs.append(r)
+                        for (_, reg), r in zip(arg_regs, temp_regs):
+                            yield f'. {reg} {r}\n'
                         yield f'| {call_fn.name}\n'
                     else:
+                        for arg, (ty, reg) in zip(expr.args, arg_regs):
+                            _, expr_ty = yield from parse_expr(ctx, reg, arg, ty)
+                            assert ty == expr_ty, f'{ty} == {expr_ty}'
                         yield f'| {function}\n'
                     if call_fn.ret_type is not None:
                         if isinstance(call_fn, IlFunction):
@@ -512,6 +595,14 @@ class Unit:
                     instr = '.+'[is_value]
                     yield f'{instr} {assign} {reg_or_value}\n'
                     return assign, ty
+                elif isinstance(expr, ExprArray):
+                    array, index_ty, value_ty = ctx.get_array_register(expr.array)
+                    assert expect_ty is None or expect_ty == value_ty
+                    index, _ = yield from parse_expr(ctx, None, expr.index, index_ty)
+                    if assign is None:
+                        assign = ctx.add_register(None, value_ty)
+                    yield '}' f' {array} {index} {assign}\n'
+                    return assign, value_ty
                 else:
                     assert 0, repr(type(expr))
 
@@ -622,6 +713,7 @@ class Unit:
                         yield f'> {ctx.name}\n'
                     elif isinstance(stmt, If):
                         new_ctx = Context(ctx, f'if.{scope_counter}')
+                        new_ctx_else = Context(ctx, f'else.{scope_counter}')
                         scope_counter += 1
                         next_block()
 
@@ -629,11 +721,17 @@ class Unit:
 
                         yield f'= {new_ctx.name}.switch\n'
                         yield f'[ {new_ctx.name}.switch {reg}\n'
-                        yield f'? 0 {ctx.name}\n'
+                        yield f'? 0 {new_ctx_else.name}\n'
                         yield f'! {new_ctx.name}\n'
+
                         cont = yield from parse_scope(new_ctx, stmt.scope)
                         if cont:
                             yield f'= {ctx.name}\n'
+
+                        cont = yield from parse_scope(new_ctx_else, stmt.otherwise)
+                        if cont:
+                            yield f'= {ctx.name}\n'
+
                         yield f'> {ctx.name}\n'
                     elif isinstance(stmt, Break):
                         yield f'= {loop_stack[-1].prev.name}\n'
@@ -694,7 +792,7 @@ def parse(path, unit = None) -> Unit:
 
     def assert_is(tk, expect, skip_nl = False):
         while True:
-            if not skip_nl or tk != '\n':
+            if not skip_nl or tk != TokenSingle('\n'):
                 break
             tk = next(tokens)
         if type(expect) is tuple:
@@ -741,7 +839,9 @@ def parse(path, unit = None) -> Unit:
         if tk == TokenSingle('('):
             return parse_expr_args(fn, tk), None
         if tk == TokenSingle('['):
-            assert 0, 'array access'
+            index, tk = parse_expr(None)
+            assert_is(tk, TokenSingle(']'))
+            return ExprArray(fn, index), None
         raise Exception(f'can\'t parse this {tk}')
 
     def parse_expr_args(fn, tk):
@@ -803,7 +903,7 @@ def parse(path, unit = None) -> Unit:
             while True:
                 thing = next_without_nl()
                 if thing == TokenSingle('}'):
-                    assert_next(TokenSingle('\n'))
+                    #assert_next(TokenSingle('\n'))
                     break
                 if thing == TokenIdent('return'):
                     tk = next(tokens)
@@ -840,13 +940,26 @@ def parse(path, unit = None) -> Unit:
                     scope = parse_scope()
                     f.push(ForIn(index, value_ref, value, array, scope))
                 elif thing == TokenIdent('if'):
-                    expr, tk = parse_expr(None)
-                    if tk is None:
-                        tk = next_single()
-                    assert_is(tk, TokenSingle('{'))
-                    assert_next(TokenSingle('\n'))
-                    scope = parse_scope()
-                    f.push(If(expr, scope))
+                    prev_scope = f
+                    while True:
+                        expr, tk = parse_expr(None)
+                        if tk is None:
+                            tk = next_single()
+                        assert_is(tk, TokenSingle('{'))
+                        tk = assert_next(TokenSingle('\n'))
+                        scope = parse_scope()
+                        tk = assert_next((TokenSingle('\n'), TokenIdent('else')))
+                        cur_if = If(expr, scope, Scope())
+                        prev_scope.push(cur_if)
+                        prev_scope = cur_if.otherwise
+                        if tk == TokenIdent('else'):
+                            tk = assert_next((TokenSingle('{'), TokenIdent('if')))
+                            if tk == TokenIdent('if'):
+                                continue
+                            else:
+                                cur_if.otherwise = parse_scope()
+                                assert_next(TokenSingle('\n'))
+                        break
                 elif thing == TokenIdent('break'):
                     assert_next(TokenSingle('\n'))
                     f.push(Break())
@@ -904,7 +1017,7 @@ def parse(path, unit = None) -> Unit:
         root = parse_scope()
         unit.functions[function] = Function(args, ret_type, root)
 
-    def handle_record():
+    def handle_record(emit = True):
         record = next_ident().value
         assert_next(TokenSingle('{'))
         assert_next(TokenSingle('\n'))
@@ -923,7 +1036,7 @@ def parse(path, unit = None) -> Unit:
             if field in fields:
                 raise Exception(f'field "{field}" in record "{record}" already defined')
             fields[field] = ty
-        unit.records[record] = fields
+        unit.records[record] = Record(fields, emit)
 
     def handle_enum():
         enum = next(tokens)
@@ -1010,10 +1123,28 @@ def parse(path, unit = None) -> Unit:
             ret_type = ret_reg = None
         unit.functions[name] = IlFunction(fn_name, args, ret_type, ret_reg)
 
-    def handle_il_type():
-        name = next(tokens)
-        ty = next_str()
+    def handle_il_type_record():
+        handle_record(False)
+
+    def handle_il_type_alias():
+        frm = next_ident().value
+        to = next_str().value
         assert_next(TokenSingle('\n'))
+        unit.type_name_remap[frm] = to
+
+    def handle_il_type():
+        assert_next(TokenOp('.'))
+        tk = next_ident()
+        {
+            'record': handle_il_type_record,
+            'alias': handle_il_type_alias,
+        }[tk.value]()
+
+    def handle_il_constant():
+        ty = next_ident().value
+        name = next_ident().value
+        assert_next(TokenSingle('\n'))
+        unit.constants[ty, name] = None
 
     def handle_il():
         assert_next(TokenOp('.'))
@@ -1021,6 +1152,7 @@ def parse(path, unit = None) -> Unit:
         {
             'function': handle_il_function,
             'type': handle_il_type,
+            'constant': handle_il_constant
         }[tk.value]()
 
     keyword_handlers = {
@@ -1059,22 +1191,36 @@ if __name__ == '__main__':
         yield 'Constants:'
         for (ty, name), values in unit.constants.items():
             yield f'  {ty} {name}'
-            for field, value in values.items():
-                yield f'    {field} {value}'
+            if values is None:
+                yield '    (il)'
+            else:
+                for field, value in values.items():
+                    yield f'    {field} {value}'
         yield 'Registers:'
         for name, ty in unit.registers.items():
             yield f'  {ty} {name}'
+
+        def dump_scope(scope):
+            for stmt in scope.statements:
+                if isinstance(stmt, If):
+                    yield f'if'
+                    for s in dump_scope(stmt.scope):
+                        yield '  ' + s
+                    yield f'else'
+                    for s in dump_scope(stmt.otherwise):
+                        yield '  ' + s
+                else:
+                    yield f'{stmt}'
         yield 'Functions:'
         for name, fn in unit.functions.items():
             yield f'  {name}'
             if isinstance(fn, IlFunction):
-                yield '    (il.function)'
+                yield '     (il.function)'
             else:
-                for stmt in fn.root.statements:
-                    yield f'    {stmt}'
+                for s in dump_scope(fn.root):
+                    yield '    ' + s
 
     for l in dump():
-        break
         print('#', l)
 
     for s in unit.to_il():
