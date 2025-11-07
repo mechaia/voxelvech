@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-mechaia = { path = "../engine/mechaia", features = ["voxel"] }
+mechaia = { git = "https://github.com/mechaia/engine", rev = "9d70b7c", features = ["voxel"] }
 
 [profile.release]
 lto = "fat"

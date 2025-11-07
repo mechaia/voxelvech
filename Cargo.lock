@@ -942,6 +942,7 @@ dependencies = [
 [[package]]
 name = "mechaia"
 version = "0.1.0"
+source = "git+https://github.com/mechaia/engine?rev=9d70b7c#9d70b7c7607ea5a6e78692a6c9fe4ae2215a1f3c"
 dependencies = [
  "glam",
  "mechaia_gui",
@@ -958,6 +959,7 @@ dependencies = [
 [[package]]
 name = "mechaia_gui"
 version = "0.1.0"
+source = "git+https://github.com/mechaia/engine?rev=9d70b7c#9d70b7c7607ea5a6e78692a6c9fe4ae2215a1f3c"
 dependencies = [
  "ash",
  "glam",
@@ -969,6 +971,7 @@ dependencies = [
 [[package]]
 name = "mechaia_input"
 version = "0.1.0"
+source = "git+https://github.com/mechaia/engine?rev=9d70b7c#9d70b7c7607ea5a6e78692a6c9fe4ae2215a1f3c"
 dependencies = [
  "mechaia_window",
 ]
@@ -976,6 +979,7 @@ dependencies = [
 [[package]]
 name = "mechaia_model"
 version = "0.1.0"
+source = "git+https://github.com/mechaia/engine?rev=9d70b7c#9d70b7c7607ea5a6e78692a6c9fe4ae2215a1f3c"
 dependencies = [
  "glam",
  "gltf",
@@ -985,6 +989,7 @@ dependencies = [
 [[package]]
 name = "mechaia_physics3d"
 version = "0.1.0"
+source = "git+https://github.com/mechaia/engine?rev=9d70b7c#9d70b7c7607ea5a6e78692a6c9fe4ae2215a1f3c"
 dependencies = [
  "glam",
  "mechaia_util",
@@ -994,6 +999,7 @@ dependencies = [
 [[package]]
 name = "mechaia_render"
 version = "0.1.0"
+source = "git+https://github.com/mechaia/engine?rev=9d70b7c#9d70b7c7607ea5a6e78692a6c9fe4ae2215a1f3c"
 dependencies = [
  "ash",
  "ash-window",
@@ -1008,6 +1014,7 @@ dependencies = [
 [[package]]
 name = "mechaia_sound"
 version = "0.1.0"
+source = "git+https://github.com/mechaia/engine?rev=9d70b7c#9d70b7c7607ea5a6e78692a6c9fe4ae2215a1f3c"
 dependencies = [
  "cpal",
  "glam",
@@ -1019,6 +1026,7 @@ dependencies = [
 [[package]]
 name = "mechaia_util"
 version = "0.1.0"
+source = "git+https://github.com/mechaia/engine?rev=9d70b7c#9d70b7c7607ea5a6e78692a6c9fe4ae2215a1f3c"
 dependencies = [
  "glam",
  "num-complex",
@@ -1028,6 +1036,7 @@ dependencies = [
 [[package]]
 name = "mechaia_voxel_common"
 version = "0.1.0"
+source = "git+https://github.com/mechaia/engine?rev=9d70b7c#9d70b7c7607ea5a6e78692a6c9fe4ae2215a1f3c"
 dependencies = [
  "glam",
 ]
@@ -1035,6 +1044,7 @@ dependencies = [
 [[package]]
 name = "mechaia_window"
 version = "0.1.0"
+source = "git+https://github.com/mechaia/engine?rev=9d70b7c#9d70b7c7607ea5a6e78692a6c9fe4ae2215a1f3c"
 dependencies = [
  "glam",
  "winit",
