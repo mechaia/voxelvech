@@ -3,7 +3,7 @@
 Demo created to test the Mechaia engine.
 Contains lots of tasty bugs.
 
-[Preview](preview.png)
+![Preview](preview.png)
 
 ## Building
 
